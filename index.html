@@ -101,28 +101,67 @@
                 loadData();
             }, []);
 
+            const API_URL = "https://script.google.com/macros/s/AKfycbxwX7fskY9GLH-ByVd5umAS9h7hxaZux4njUJcADW_zBWSaudLZSJ-YDxbQGr4IHrNisQ/exec";
             const loadData = () => {
-                try {
-                    // const customersData = localStorage.getItem('oonjai_customers');
-                    const API_URL_CUSTOMERS = "https://script.google.com/macros/s/AKfycbzEY9KgvmmlcVSIdUnGe5DjFXYtMaFrL6fWIfTr3fLIEwuaBvXV2l9-z8Rqis85xln8oA/exec";
-                    fetch(API_URL_CUSTOMERS)
-                        .then(res_customersData => res_customersData.json())
-                        .then(data => {
-                        customersData = data;
-                    });
-                    const staffData = localStorage.getItem('oonjai_staff');
+                setLoading(true);
+                fetch(API_URL + "?sheet=customers")
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        setCustomers(Array.isArray(data) ? data : []);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                        alert('เกิดข้อผิดพลาดในการดึงข้อมูล');
+                    })
+
+                fetch(API_URL + "?sheet=staffs")
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        setStaff(Array.isArray(data) ? data : []);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching data:', error);
+                        alert('เกิดข้อผิดพลาดในการดึงข้อมูล');
+                    })
                     
-                    if (customersData) {
-                        setCustomers(JSON.parse(customersData));
-                    }
-                    if (staffData) {
-                        setStaff(JSON.parse(staffData));
-                    }
-                } catch (error) {
-                    console.log('Loading initial data');
-                }
                 setLoading(false);
             };
+
+
+            // const loadData = () => {
+            //     try {
+            //         // const customersData = localStorage.getItem('oonjai_customers');
+            //         // const API_URL_CUSTOMERS = "https://script.google.com/macros/s/AKfycbzEY9KgvmmlcVSIdUnGe5DjFXYtMaFrL6fWIfTr3fLIEwuaBvXV2l9-z8Rqis85xln8oA/exec";
+            //         // console.log(API_URL_CUSTOMERS);
+            //         // fetch(API_URL_CUSTOMERS)
+            //         //     .then(res => res.json())
+            //         //     .then(data => {
+            //         //     customers = data;
+            //         // });
+            //         // const customersData = customers;
+            //         const staffData = localStorage.getItem('oonjai_staff');
+                    
+            //         // if (customersData) {
+            //         //     setCustomers(JSON.parse(customersData));
+            //         // }
+            //         if (staffData) {
+            //             setStaff(JSON.parse(staffData));
+            //         }
+            //     } catch (error) {
+            //         console.log('Loading initial data');
+            //     }
+            //     setLoading(false);
+            // };
 
             const saveCustomers = (newCustomers) => {
                 try {
