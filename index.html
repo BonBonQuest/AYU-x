@@ -103,7 +103,10 @@
 
             const loadData = () => {
                 try {
-                    const customersData = localStorage.getItem('oonjai_customers');
+                    // const customersData = localStorage.getItem('oonjai_customers');
+                    const API_URL_CUSTOMERS = "https://script.google.com/macros/s/AKfycbzEY9KgvmmlcVSIdUnGe5DjFXYtMaFrL6fWIfTr3fLIEwuaBvXV2l9-z8Rqis85xln8oA/exec";
+                    const res_customersData = await fetch(API_URL);
+                    const customersData = await res_customersData.json();
                     const staffData = localStorage.getItem('oonjai_staff');
                     
                     if (customersData) {
