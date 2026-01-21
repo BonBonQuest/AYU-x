@@ -1,888 +1,939 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>อุ่นใจ โฮมแคร์ - ระบบจัดการข้อมูล</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <title>Management System</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        dark: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .dark body {
+            background-color: #020617;
+            color: #f1f5f9;
+        }
+
+        .mainBG {
+            background-color: #f2f2f2;
+        }
+
+        .dark .mainBG {
+            background-color: #0f172a;
+        }
+
+        /* Glassmorphism */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        .dark .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </head>
-<body>
+
+<body class="antialiased min-h-screen">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
+        // --- Icon Wrapper & Definitions ---
+        // Fix for Lucide icons in standalone React
+        const Icon = ({ name, size = 24, className = "" }) => {
+            const iconName = name.charAt(0).toUpperCase() + name.slice(1);
+            const iconData = lucide.icons[iconName];
 
-        // Lucide React icons as inline SVG components
-        const Search = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.35-4.35"></path>
-            </svg>
-        );
+            if (!iconData) return null;
 
-        const Plus = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-        );
-
-        const Download = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-            </svg>
-        );
-
-        const Users = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-        );
-
-        const UserCheck = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="8.5" cy="7" r="4"></circle>
-                <polyline points="17 11 19 13 23 9"></polyline>
-            </svg>
-        );
-
-        const Calendar = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
-        );
-
-        const Clock = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
-        );
-
-        const MapPin = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-            </svg>
-        );
-
-        const FileText = ({ size = 24, className = "" }) => (
-            <svg className={className} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                <polyline points="14 2 14 8 20 8"></polyline>
-                <line x1="16" y1="13" x2="8" y2="13"></line>
-                <line x1="16" y1="17" x2="8" y2="17"></line>
-                <polyline points="10 9 9 9 8 9"></polyline>
-            </svg>
-        );
-
-        const OonjaiManagementSystem = () => {
-            const [activeTab, setActiveTab] = useState('dashboard');
-            const [customers, setCustomers] = useState([]);
-            const [staff, setStaff] = useState([]);
-            const [searchTerm, setSearchTerm] = useState('');
-            const [showCustomerForm, setShowCustomerForm] = useState(false);
-            const [showStaffForm, setShowStaffForm] = useState(false);
-            const [loading, setLoading] = useState(true);
-
-            useEffect(() => {
-                loadData();
-            }, []);
-
-            const API_URL = "https://script.google.com/macros/s/AKfycbxwX7fskY9GLH-ByVd5umAS9h7hxaZux4njUJcADW_zBWSaudLZSJ-YDxbQGr4IHrNisQ/exec";
-            const loadData = () => {
-                setLoading(true);
-                fetch(API_URL + "?sheet=customers")
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        setCustomers(Array.isArray(data) ? data : []);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching data:', error);
-                        alert('เกิดข้อผิดพลาดในการดึงข้อมูล');
-                    })
-
-                fetch(API_URL + "?sheet=staffs")
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error('Network response was not ok');
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        setStaff(Array.isArray(data) ? data : []);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching data:', error);
-                        alert('เกิดข้อผิดพลาดในการดึงข้อมูล');
-                    })
-                    
-                setLoading(false);
-            };
-
-
-            // const loadData = () => {
-            //     try {
-            //         // const customersData = localStorage.getItem('oonjai_customers');
-            //         // const API_URL_CUSTOMERS = "https://script.google.com/macros/s/AKfycbzEY9KgvmmlcVSIdUnGe5DjFXYtMaFrL6fWIfTr3fLIEwuaBvXV2l9-z8Rqis85xln8oA/exec";
-            //         // console.log(API_URL_CUSTOMERS);
-            //         // fetch(API_URL_CUSTOMERS)
-            //         //     .then(res => res.json())
-            //         //     .then(data => {
-            //         //     customers = data;
-            //         // });
-            //         // const customersData = customers;
-            //         const staffData = localStorage.getItem('oonjai_staff');
-                    
-            //         // if (customersData) {
-            //         //     setCustomers(JSON.parse(customersData));
-            //         // }
-            //         if (staffData) {
-            //             setStaff(JSON.parse(staffData));
-            //         }
-            //     } catch (error) {
-            //         console.log('Loading initial data');
-            //     }
-            //     setLoading(false);
-            // };
-
-            const saveCustomers = (newCustomers) => {
-                try {
-                    localStorage.setItem('oonjai_customers', JSON.stringify(newCustomers));
-                    setCustomers(newCustomers);
-                } catch (error) {
-                    console.error('Error saving customers:', error);
-                    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-                }
-            };
-
-            const saveStaff = (newStaff) => {
-                try {
-                    localStorage.setItem('oonjai_staff', JSON.stringify(newStaff));
-                    setStaff(newStaff);
-                } catch (error) {
-                    console.error('Error saving staff:', error);
-                    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-                }
-            };
-
-            const deleteCustomer = (id) => {
-                if (confirm('ยืนยันการลบข้อมูลลูกค้า?')) {
-                    const newCustomers = customers.filter(c => c.id !== id);
-                    saveCustomers(newCustomers);
-                }
-            };
-
-            const deleteStaff = (id) => {
-                if (confirm('ยืนยันการลบข้อมูลพนักงาน?')) {
-                    const newStaff = staff.filter(s => s.id !== id);
-                    saveStaff(newStaff);
-                }
-            };
-
-            const exportToCSV = (data, filename) => {
-                if (data.length === 0) {
-                    alert('ไม่มีข้อมูลให้ Export');
-                    return;
-                }
-
-                const headers = Object.keys(data[0]).join(',');
-                const rows = data.map(item => 
-                    Object.values(item).map(val => 
-                        typeof val === 'string' && val.includes(',') ? `"${val}"` : val
-                    ).join(',')
-                );
-                
-                const csv = [headers, ...rows].join('\n');
-                const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
-                link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
-                link.click();
-            };
-
-            const CustomerForm = () => {
-                const [formData, setFormData] = useState({
-                    id: Date.now(),
-                    customerName: '',
-                    age: '',
-                    healthCondition: '',
-                    serviceType: 'NA',
-                    rate: '',
-                    serviceDate: '',
-                    shift: 'D',
-                    shiftTime: '',
-                    location: '',
-                    notes: '',
-                    createdAt: new Date().toISOString()
-                });
-
-                const handleSubmit = (e) => {
-                    e.preventDefault();
-                    const newCustomers = [...customers, formData];
-                    saveCustomers(newCustomers);
-                    setShowCustomerForm(false);
-                    alert('บันทึกข้อมูลลูกค้าเรียบร้อยแล้ว');
-                };
+            // Handle Lucide's array structure for icon definitions
+            // usually: [ ['path', {d:...}], ... ]
+            if (Array.isArray(iconData)) {
+                const svgContent = iconData.map(([tag, attrs]) => {
+                    const attrStr = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ');
+                    // Self-closing tags in SVG string or strict open/close
+                    return `<${tag} ${attrStr}></${tag}>`;
+                }).join('');
 
                 return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                            <h3 className="text-xl font-bold mb-4 text-teal-700">เพิ่มข้อมูลลูกค้า</h3>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">ชื่อ-นามสกุล *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={formData.customerName}
-                                            onChange={(e) => setFormData({...formData, customerName: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="คุณวิลาวัณย์ แซ่อุน"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">อายุ *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={formData.age}
-                                            onChange={(e) => setFormData({...formData, age: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="75"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">สภาพสุขภาพ / ความต้องการดูแล *</label>
-                                    <textarea
-                                        required
-                                        value={formData.healthCondition}
-                                        onChange={(e) => setFormData({...formData, healthCondition: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        rows="3"
-                                        placeholder="ช่วยเหลือตัวเองได้ปกติ, มีอัลไซเมอร์ระยะเริ่มต้น, อยู่เป็นเพื่อน ชวนคุย เตือนทานข้าว ทานยา"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">ประเภทบริการ *</label>
-                                        <select
-                                            required
-                                            value={formData.serviceType}
-                                            onChange={(e) => setFormData({...formData, serviceType: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                        >
-                                            <option value="RN">RN (พยาบาลวิชาชีพ)</option>
-                                            <option value="PN">PN (พยาบาลเทคนิค)</option>
-                                            <option value="NA">NA (ผู้ช่วยพยาบาล)</option>
-                                            <option value="CG">CG (ผู้ดูแลผู้สูงอายุ)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">เรทราคา (บาท) *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={formData.rate}
-                                            onChange={(e) => setFormData({...formData, rate: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="1100"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">วันที่ใช้บริการ *</label>
-                                        <input
-                                            type="text"
-                                            required
-                                            value={formData.serviceDate}
-                                            onChange={(e) => setFormData({...formData, serviceDate: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="27-29 มกราคม"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">เวร *</label>
-                                        <select
-                                            required
-                                            value={formData.shift}
-                                            onChange={(e) => setFormData({...formData, shift: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                        >
-                                            <option value="D">Day (กลางวัน)</option>
-                                            <option value="N">Night (กลางคืน)</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">เวลา</label>
-                                        <input
-                                            type="text"
-                                            value={formData.shiftTime}
-                                            onChange={(e) => setFormData({...formData, shiftTime: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="07.00-19.00 น."
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">สถานที่ / พิกัด *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.location}
-                                        onChange={(e) => setFormData({...formData, location: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="บ้านใหม่ เทพารักษ์ สมุทรปราการ"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">หมายเหตุเพิ่มเติม</label>
-                                    <textarea
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        rows="2"
-                                        placeholder="ขอคนสะดวกเดินทาง"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2 pt-4">
-                                    <button
-                                        type="submit"
-                                        className="flex-1 bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700"
-                                    >
-                                        บันทึกข้อมูล
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowCustomerForm(false)}
-                                        className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-                                    >
-                                        ยกเลิก
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width={size}
+                        height={size}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={className}
+                        dangerouslySetInnerHTML={{ __html: svgContent }}
+                        style={{ display: 'inline-block', verticalAlign: 'middle' }}
+                    />
                 );
+            }
+
+            return null;
+        };
+
+        const LayoutDashboard = (props) => <Icon name="LayoutDashboard" {...props} />;
+        const Users = (props) => <Icon name="Users" {...props} />;
+        const Briefcase = (props) => <Icon name="Briefcase" {...props} />;
+        const Plus = (props) => <Icon name="Plus" {...props} />;
+        const Trash2 = (props) => <Icon name="Trash2" {...props} />;
+        const Edit = (props) => <Icon name="Edit" {...props} />;
+        const Search = (props) => <Icon name="Search" {...props} />;
+        const Moon = (props) => <Icon name="Moon" {...props} />;
+        const Sun = (props) => <Icon name="Sun" {...props} />;
+        const CheckCircle = (props) => <Icon name="CheckCircle" {...props} />;
+        const XCircle = (props) => <Icon name="XCircle" {...props} />;
+        const Calendar = (props) => <Icon name="Calendar" {...props} />;
+        const MapPin = (props) => <Icon name="MapPin" {...props} />;
+        const Clock = (props) => <Icon name="Clock" {...props} />;
+        const Activity = (props) => <Icon name="Activity" {...props} />;
+        const Menu = (props) => <Icon name="Menu" {...props} />;
+        const X = (props) => <Icon name="X" {...props} />;
+        const Home = (props) => <Icon name="Home" {...props} />;
+
+
+        // --- UI Components ---
+
+        const Card = ({ children, className = "" }) => (
+            <div className={`glass-panel rounded-2xl shadow-sm p-6 ${className}`}>
+                {children}
+            </div>
+        );
+
+        const Button = ({ children, onClick, variant = 'primary', className = "", type = "button" }) => {
+            const baseStyle = "px-4 py-2 rounded-xl font-medium transition-all duration-200 flex items-center gap-2 active:scale-95";
+            const variants = {
+                primary: "bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-500/30",
+                secondary: "bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                danger: "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/30",
+                ghost: "text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-800"
             };
+            return (
+                <button type={type} onClick={onClick} className={`${baseStyle} ${variants[variant]} ${className}`}>
+                    {children}
+                </button>
+            );
+        };
 
-            const StaffForm = () => {
-                const [formData, setFormData] = useState({
-                    id: Date.now(),
-                    staffName: '',
-                    qualification: '',
-                    rate: '',
-                    availability: '',
-                    experience: '',
-                    address: '',
-                    phone: '',
-                    notes: '',
-                    createdAt: new Date().toISOString()
-                });
+        const Input = ({ label, name, value, onChange, placeholder, type = "text", required = false }) => (
+            <div className="flex flex-col gap-1.5">
+                {label && <label className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</label>}
+                <input
+                    type={type}
+                    name={name}
+                    value={value}
+                    onChange={onChange}
+                    required={required}
+                    placeholder={placeholder}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
+                />
+            </div>
+        );
 
-                const handleSubmit = (e) => {
-                    e.preventDefault();
-                    const newStaff = [...staff, formData];
-                    saveStaff(newStaff);
-                    setShowStaffForm(false);
-                    alert('บันทึกข้อมูลพนักงานเรียบร้อยแล้ว');
-                };
+        const Select = ({ label, name, value, onChange, options, required = false }) => (
+            <div className="flex flex-col gap-1.5">
+                {label && <label className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</label>}
+                <select
+                    name={name}
+                    value={value}
+                    onChange={onChange}
+                    required={required}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
+                >
+                    <option value="" disabled>Select {label}</option>
+                    {options.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                </select>
+            </div>
+        );
 
-                return (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                            <h3 className="text-xl font-bold mb-4 text-teal-700">เพิ่มข้อมูลพนักงาน</h3>
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">ชื่อ-นามสกุล *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.staffName}
-                                        onChange={(e) => setFormData({...formData, staffName: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="นางสาวสมหมาย ใจดี"
-                                    />
-                                </div>
+        const Badge = ({ children, color = "blue" }) => {
+            const colors = {
+                blue: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+                green: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+                purple: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
+                amber: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
+            };
+            return (
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${colors[color] || colors.blue}`}>
+                    {children}
+                </span>
+            );
+        };
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">วุฒิที่จบมา *</label>
-                                        <select
-                                            required
-                                            value={formData.qualification}
-                                            onChange={(e) => setFormData({...formData, qualification: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                        >
-                                            <option value="">เลือกวุฒิ</option>
-                                            <option value="RN">RN - พยาบาลวิชาชีพ</option>
-                                            <option value="PN">PN - พยาบาลเทคนิค</option>
-                                            <option value="NA">NA - ผู้ช่วยพยาบาล</option>
-                                            <option value="CG">CG - ผู้ดูแลผู้สูงอายุ</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium mb-1">เรทราคาที่รับงาน (บาท) *</label>
-                                        <input
-                                            type="number"
-                                            required
-                                            value={formData.rate}
-                                            onChange={(e) => setFormData({...formData, rate: e.target.value})}
-                                            className="w-full border rounded px-3 py-2"
-                                            placeholder="1000"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">ระยะเวลาที่รับงาน / ความพร้อม *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.availability}
-                                        onChange={(e) => setFormData({...formData, availability: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="รับงานเวร Day, สัปดาห์ละ 5 วัน"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">ประสบการณ์การทำงาน *</label>
-                                    <textarea
-                                        required
-                                        value={formData.experience}
-                                        onChange={(e) => setFormData({...formData, experience: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        rows="3"
-                                        placeholder="ประสบการณ์ 5 ปี ดูแลผู้สูงอายุติดเตียง, ผู้ป่วยอัลไซเมอร์"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">ที่อยู่อาศัย *</label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.address}
-                                        onChange={(e) => setFormData({...formData, address: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="บางนา กรุงเทพฯ"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">เบอร์โทรศัพท์</label>
-                                    <input
-                                        type="tel"
-                                        value={formData.phone}
-                                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        placeholder="081-234-5678"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium mb-1">หมายเหตุเพิ่มเติม</label>
-                                    <textarea
-                                        value={formData.notes}
-                                        onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                                        className="w-full border rounded px-3 py-2"
-                                        rows="2"
-                                        placeholder="ข้อมูลเพิ่มเติม"
-                                    />
-                                </div>
-
-                                <div className="flex gap-2 pt-4">
-                                    <button
-                                        type="submit"
-                                        className="flex-1 bg-teal-600 text-white px-4 py-2 rounded hover:bg-teal-700"
-                                    >
-                                        บันทึกข้อมูล
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowStaffForm(false)}
-                                        className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400"
-                                    >
-                                        ยกเลิก
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+        // --- Stats Card Component ---
+        const StatCard = ({ title, value, icon, trend, subLabel }) => (
+            <Card className="relative overflow-hidden group hover:border-brand-500/30 transition-all">
+                <div className="flex justify-between items-start z-10 relative">
+                    <div>
+                        <p className="text-slate-500 dark:text-slate-400 font-medium mb-1">{title}</p>
+                        <h3 className="text-3xl font-bold text-slate-800 dark:text-white mb-1">{value}</h3>
+                        {subLabel && <p className="text-sm text-slate-400 dark:text-slate-500">{subLabel}</p>}
                     </div>
-                );
-            };
+                    <div className="p-3 bg-brand-50 dark:bg-brand-900/20 text-brand-600 rounded-xl group-hover:scale-110 transition-transform">
+                        {icon}
+                    </div>
+                </div>
+                {/* Decorative background blob */}
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-brand-500/5 rounded-full blur-2xl group-hover:bg-brand-500/10 transition-colors"></div>
+            </Card>
+        );
 
-            const Dashboard = () => (
-                <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-teal-700">ภาพรวมระบบจัดการ</h2>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white p-6 rounded-lg shadow-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-teal-100">ลูกค้าทั้งหมด</p>
-                                    <p className="text-4xl font-bold mt-2">{customers.length}</p>
-                                </div>
-                                <Users size={64} className="text-teal-200" />
-                            </div>
-                        </div>
 
-                        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-6 rounded-lg shadow-lg">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-blue-100">พนักงานทั้งหมด</p>
-                                    <p className="text-4xl font-bold mt-2">{staff.length}</p>
-                                </div>
-                                <UserCheck size={64} className="text-blue-200" />
-                            </div>
-                        </div>
+        // --- Views ---
+
+        // 1. Dashboard
+        const Dashboard = ({ customers, staff }) => {
+            const totalCustomers = customers.length;
+            const activeCustomers = customers.filter(c => c.status !== 'Inactive').length; // Assuming logical status or just all
+
+            const totalStaff = staff.length;
+            const totalShiftD = customers.filter(c => c.shift === 'D').length;
+
+            // Calculate some simple stats
+            const avgAge = customers.length > 0
+                ? Math.round(customers.reduce((acc, curr) => acc + (parseInt(curr.age) || 0), 0) / customers.length)
+                : 0;
+
+            const recentCustomers = [...customers].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+
+            return (
+                <div className="space-y-6 fade-in">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Dashboard</h2>
+                        <p className="text-slate-500 dark:text-slate-400">Overview of your operations</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-lg shadow">
-                            <h3 className="text-lg font-bold mb-4 text-teal-700">ลูกค้าล่าสุด</h3>
-                            {customers.slice(-5).reverse().map(customer => (
-                                <div key={customer.id} className="border-b py-3 last:border-b-0">
-                                    <p className="font-semibold">{customer.customerName}</p>
-                                    <p className="text-sm text-gray-600">{customer.serviceType} - {customer.serviceDate}</p>
-                                </div>
-                            ))}
-                            {customers.length === 0 && (
-                                <p className="text-gray-400 text-center py-4">ยังไม่มีข้อมูลลูกค้า</p>
-                            )}
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <StatCard
+                            title="Total Customers"
+                            value={totalCustomers}
+                            icon={<Users size={24} />}
+                            subLabel="Active directory"
+                        />
+                        <StatCard
+                            title="Total Staff"
+                            value={totalStaff}
+                            icon={<Briefcase size={24} />}
+                            subLabel="Qualified personnel"
+                        />
+                        <StatCard
+                            title="Day Shifts"
+                            value={totalShiftD}
+                            icon={<Sun size={24} />}
+                            subLabel="Scheduled for Day"
+                        />
+                        <StatCard
+                            title="Average Age"
+                            value={avgAge}
+                            icon={<Activity size={24} />}
+                            subLabel="Customer demographic"
+                        />
+                    </div>
 
-                        <div className="bg-white p-6 rounded-lg shadow">
-                            <h3 className="text-lg font-bold mb-4 text-blue-700">พนักงานล่าสุด</h3>
-                            {staff.slice(-5).reverse().map(s => (
-                                <div key={s.id} className="border-b py-3 last:border-b-0">
-                                    <p className="font-semibold">{s.staffName}</p>
-                                    <p className="text-sm text-gray-600">{s.qualification} - ฿{s.rate}</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card>
+                            <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white flex items-center gap-2">
+                                <Clock size={20} className="text-brand-500" />
+                                Recent Customers
+                            </h3>
+                            {recentCustomers.length === 0 ? (
+                                <p className="text-slate-400 text-center py-8">No recent activity</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    {recentCustomers.map(c => (
+                                        <div key={c.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-brand-100 dark:bg-brand-900/30 flex items-center justify-center text-brand-600 font-bold">
+                                                    {c.customerName.charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="font-medium text-slate-800 dark:text-slate-200">{c.customerName}</p>
+                                                    <p className="text-xs text-slate-500">{c.serviceType} • {c.location}</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xs text-slate-400">
+                                                {new Date(c.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                            {staff.length === 0 && (
-                                <p className="text-gray-400 text-center py-4">ยังไม่มีข้อมูลพนักงาน</p>
                             )}
-                        </div>
+                        </Card>
+                        <Card>
+                            <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white flex items-center gap-2">
+                                <CheckCircle size={20} className="text-emerald-500" />
+                                Staff Availability
+                            </h3>
+                            <div className="space-y-4">
+                                {staff.slice(0, 5).map(s => (
+                                    <div key={s.id} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                                        <div>
+                                            <p className="font-medium text-slate-800 dark:text-slate-200">{s.staffName}</p>
+                                            <p className="text-xs text-slate-500">{s.qualification}</p>
+                                        </div>
+                                        <Badge color={s.availability === 'Full-time' ? 'green' : (s.availability === 'Part-time' ? 'blue' : 'amber')}>
+                                            {s.availability || 'N/A'}
+                                        </Badge>
+                                    </div>
+                                ))}
+                                {staff.length === 0 && <p className="text-slate-400 text-center py-8">No staff records</p>}
+                            </div>
+                        </Card>
                     </div>
                 </div>
             );
+        };
 
-            const CustomerList = () => {
-                const filteredCustomers = customers.filter(c => 
-                    c.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    c.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    c.serviceType.toLowerCase().includes(searchTerm.toLowerCase())
-                );
+        // 2. Customer Manager
+        const CustomerManager = ({ customers, setCustomers, postToSheet }) => {
+            const [view, setView] = useState('list'); // 'list' | 'form'
+            const [isSaving, setIsSaving] = useState(false);
 
-                return (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-teal-700">จัดการข้อมูลลูกค้า</h2>
-                            <button
-                                onClick={() => exportToCSV(customers, 'oonjai_customers')}
-                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                            >
-                                <Download size={18} />
-                                Export CSV
-                            </button>
-                        </div>
-
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-                            <input
-                                type="text"
-                                placeholder="ค้นหาลูกค้า..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                            />
-                        </div>
-
-                        <div className="grid gap-4">
-                            {filteredCustomers.map(customer => (
-                                <div key={customer.id} className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h3 className="text-xl font-bold text-teal-700">{customer.customerName}</h3>
-                                            <p className="text-gray-600">อายุ {customer.age} ปี</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <span className="bg-teal-100 text-teal-800 px-3 py-1 rounded-full text-sm font-semibold">
-                                                {customer.serviceType}
-                                            </span>
-                                            <button
-                                                onClick={() => deleteCustomer(customer.id)}
-                                                className="text-red-600 hover:text-red-800 px-2"
-                                                title="ลบข้อมูล"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2 text-sm">
-                                        <div className="flex items-start gap-2">
-                                            <FileText size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                                            <p className="text-gray-700">{customer.healthCondition}</p>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-2">
-                                            <Calendar size={16} className="text-gray-400" />
-                                            <p className="text-gray-700">{customer.serviceDate}</p>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <Clock size={16} className="text-gray-400" />
-                                            <p className="text-gray-700">
-                                                เวร {customer.shift === 'D' ? 'Day' : 'Night'} 
-                                                {customer.shiftTime && ` (${customer.shiftTime})`}
-                                            </p>
-                                        </div>
-
-                                        <div className="flex items-center gap-2">
-                                            <MapPin size={16} className="text-gray-400" />
-                                            <p className="text-gray-700">{customer.location}</p>
-                                        </div>
-
-                                        <div className="pt-2 border-t">
-                                            <p className="font-semibold text-teal-700">เรท: ฿{customer.rate}</p>
-                                        </div>
-
-                                        {customer.notes && (
-                                            <div className="pt-2 border-t">
-                                                <p className="text-gray-600 italic">หมายเหตุ: {customer.notes}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {filteredCustomers.length === 0 && (
-                            <div className="text-center py-12 text-gray-400">
-                                <Users size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>ไม่พบข้อมูลลูกค้า</p>
-                            </div>
-                        )}
-                    </div>
-                );
+            const initialForm = {
+                id: null,
+                customerName: '',
+                age: '',
+                healthCondition: '',
+                serviceType: 'NA',
+                rate: '',
+                serviceDate: '',
+                shift: 'D',
+                shiftTime: '',
+                location: '',
+                notes: '',
+                createdAt: ''
             };
 
-            const StaffList = () => {
-                const filteredStaff = staff.filter(s => 
-                    s.staffName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    s.qualification.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    s.address.toLowerCase().includes(searchTerm.toLowerCase())
-                );
+            const [formData, setFormData] = useState(initialForm);
 
-                return (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-2xl font-bold text-blue-700">จัดการข้อมูลพนักงาน</h2>
-                            <button
-                                onClick={() => exportToCSV(staff, 'oonjai_staff')}
-                                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                            >
-                                <Download size={18} />
-                                Export CSV
-                            </button>
-                        </div>
-
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 text-gray-400" size={20} />
-                            <input
-                                type="text"
-                                placeholder="ค้นหาพนักงาน..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full pl-10 pr-4 py-2 border rounded-lg"
-                            />
-                        </div>
-
-                        <div className="grid gap-4">
-                            {filteredStaff.map(s => (
-                                <div key={s.id} className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start mb-3">
-                                        <div>
-                                            <h3 className="text-xl font-bold text-blue-700">{s.staffName}</h3>
-                                            <p className="text-gray-600">{s.qualification}</p>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
-                                                ฿{s.rate}
-                                            </span>
-                                            <button
-                                                onClick={() => deleteStaff(s.id)}
-                                                className="text-red-600 hover:text-red-800 px-2"
-                                                title="ลบข้อมูล"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2 text-sm">
-                                        <div>
-                                            <p className="font-medium text-gray-700">ความพร้อม:</p>
-                                            <p className="text-gray-600">{s.availability}</p>
-                                        </div>
-
-                                        <div>
-                                            <p className="font-medium text-gray-700">ประสบการณ์:</p>
-                                            <p className="text-gray-600">{s.experience}</p>
-                                        </div>
-
-                                        <div className="flex items-start gap-2 pt-2 border-t">
-                                            <MapPin size={16} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                                            <p className="text-gray-700">{s.address}</p>
-                                        </div>
-
-                                        {s.phone && (
-                                            <div className="pt-2">
-                                                <p className="text-gray-700">📞 {s.phone}</p>
-                                            </div>
-                                        )}
-
-                                        {s.notes && (
-                                            <div className="pt-2 border-t">
-                                                <p className="text-gray-600 italic">หมายเหตุ: {s.notes}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {filteredStaff.length === 0 && (
-                            <div className="text-center py-12 text-gray-400">
-                                <UserCheck size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>ไม่พบข้อมูลพนักงาน</p>
-                            </div>
-                        )}
-                    </div>
-                );
+            const handleEdit = (customer) => {
+                setFormData(customer);
+                setView('form');
             };
 
-            if (loading) {
+            const handleDelete = async (id) => {
+                if (confirm('Are you sure you want to delete this customer?')) {
+                    try {
+                        const originalCustomers = [...customers];
+                        setCustomers(prev => prev.filter(c => c.id !== id)); // Optimistic update
+
+                        await postToSheet({
+                            sheet: 'customers',
+                            action: 'delete',
+                            payload: { id }
+                        });
+                    } catch (error) {
+                        alert('Failed to delete. Please try again.');
+                        // Revert could go here
+                        console.error(error);
+                    }
+                }
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsSaving(true);
+
+                try {
+                    const action = formData.id ? 'update' : 'add';
+                    const payload = {
+                        ...formData,
+                        id: formData.id || Date.now(),
+                        createdAt: formData.createdAt || new Date().toISOString()
+                    };
+
+                    await postToSheet({
+                        sheet: 'customers',
+                        action: action,
+                        payload: payload
+                    });
+
+                    if (action === 'update') {
+                        setCustomers(prev => prev.map(c => c.id === payload.id ? payload : c));
+                    } else {
+                        setCustomers(prev => [payload, ...prev]);
+                    }
+
+                    setView('list');
+                    setFormData(initialForm);
+                } catch (error) {
+                    console.error("Save Error:", error);
+                    alert("Failed to save data. " + error.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            if (view === 'form') {
                 return (
-                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-teal-600 mx-auto"></div>
-                            <p className="mt-4 text-gray-600">กำลังโหลดข้อมูล...</p>
+                    <div className="fade-in max-w-3xl mx-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+                                {formData.id ? 'Edit Customer' : 'New Customer'}
+                            </h2>
+                            <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }}>Cancel</Button>
                         </div>
+                        <Card>
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input label="Customer Name" name="customerName" value={formData.customerName} onChange={e => setFormData({ ...formData, customerName: e.target.value })} required placeholder="e.g. Somchai Jai-dee" />
+                                </div>
+                                <Input label="Age" type="number" name="age" value={formData.age} onChange={e => setFormData({ ...formData, age: e.target.value })} placeholder="e.g. 65" />
+                                <Input label="Health Condition" name="healthCondition" value={formData.healthCondition} onChange={e => setFormData({ ...formData, healthCondition: e.target.value })} placeholder="e.g. Diabetes, Hypertension" />
+
+                                <Select label="Service Type" name="serviceType" value={formData.serviceType} onChange={e => setFormData({ ...formData, serviceType: e.target.value })}
+                                    options={[
+                                        { value: 'NA', label: 'NA' },
+                                        { value: 'Caregiver', label: 'Caregiver' },
+                                        { value: 'Nurse', label: 'Nurse' },
+                                        { value: 'Therapy', label: 'Therapy' }
+                                    ]}
+                                />
+
+                                <Input label="Rate (THB)" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
+
+                                <Input label="Service Date" type="date" name="serviceDate" value={formData.serviceDate} onChange={e => setFormData({ ...formData, serviceDate: e.target.value })} />
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <Select label="Shift" name="shift" value={formData.shift} onChange={e => setFormData({ ...formData, shift: e.target.value })}
+                                        options={[
+                                            { value: 'D', label: 'Day (D)' },
+                                            { value: 'N', label: 'Night (N)' }
+                                        ]}
+                                    />
+                                    <Input label="Shift Time" name="shiftTime" value={formData.shiftTime} onChange={e => setFormData({ ...formData, shiftTime: e.target.value })} placeholder="e.g. 08:00 - 16:00" />
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input label="Location / Address" name="location" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} placeholder="Address or Room No." />
+                                </div>
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5 block">Notes</label>
+                                    <textarea
+                                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
+                                        rows="3"
+                                        value={formData.notes}
+                                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                        placeholder="Additional details..."
+                                    ></textarea>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 flex justify-end gap-4 mt-4">
+                                    <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }} disabled={isSaving}>Cancel</Button>
+                                    <Button type="submit" disabled={isSaving}>
+                                        {isSaving ? (
+                                            <>
+                                                <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></span>
+                                                Saving...
+                                            </>
+                                        ) : 'Save Customer'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Card>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen bg-gray-50">
-                    <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-lg">
-                        <div className="max-w-7xl mx-auto px-4 py-6">
-                            <h1 className="text-3xl font-bold">อุ่นใจ โฮมแคร์</h1>
-                            <p className="text-teal-100 mt-1">ระบบจัดการข้อมูลลูกค้าและพนักงาน</p>
+                <div className="fade-in space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Customers</h2>
+                            <p className="text-slate-500 dark:text-slate-400">Manage patient and client records</p>
                         </div>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> Add Customer</Button>
                     </div>
 
-                    <div className="bg-white shadow-md sticky top-0 z-40">
-                        <div className="max-w-7xl mx-auto px-4">
-                            <div className="flex gap-4 overflow-x-auto">
-                                <button
-                                    onClick={() => setActiveTab('dashboard')}
-                                    className={`px-6 py-4 font-medium whitespace-nowrap border-b-2 transition-colors ${
-                                        activeTab === 'dashboard'
-                                            ? 'border-teal-600 text-teal-600'
-                                            : 'border-transparent text-gray-600 hover:text-teal-600'
-                                    }`}
-                                >
-                                    📊 Dashboard
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('customers')}
-                                    className={`px-6 py-4 font-medium whitespace-nowrap border-b-2 transition-colors ${
-                                        activeTab === 'customers'
-                                            ? 'border-teal-600 text-teal-600'
-                                            : 'border-transparent text-gray-600 hover:text-teal-600'
-                                    }`}
-                                >
-                                    👥 ลูกค้า ({customers.length})
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('staff')}
-                                    className={`px-6 py-4 font-medium whitespace-nowrap border-b-2 transition-colors ${
-                                        activeTab === 'staff'
-                                            ? 'border-blue-600 text-blue-600'
-                                            : 'border-transparent text-gray-600 hover:text-blue-600'
-                                    }`}
-                                >
-                                    👨‍⚕️ พนักงาน ({staff.length})
-                                </button>
+                    {customers.length === 0 ? (
+                        <div className="text-center py-20 bg-white dark:bg-dark-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                            <div className="inline-flex p-4 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 mb-4">
+                                <Users size={40} />
                             </div>
+                            <h3 className="text-lg font-medium text-slate-900 dark:text-white">No customers yet</h3>
+                            <p className="text-slate-500 mb-6 max-w-sm mx-auto">Get started by adding your first customer to the system.</p>
+                            <Button onClick={() => setView('form')}><Plus size={20} /> Add Customer</Button>
                         </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                            {customers.map(customer => (
+                                <Card key={customer.id} className="group hover:border-brand-500/50 transition-colors">
+                                    <div className="flex flex-col md:flex-row justify-between gap-4">
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName}</h3>
+                                                <Badge color={customer.shift === 'D' ? 'amber' : 'purple'}>{customer.shift === 'D' ? 'Day' : 'Night'}</Badge>
+                                                <Badge color="blue">{customer.serviceType}</Badge>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
+                                                <div className="flex items-center gap-2"><Activity size={16} /> Age: {customer.age}</div>
+                                                <div className="flex items-center gap-2"><MapPin size={16} /> {customer.location || "No location"}</div>
+                                                <div className="flex items-center gap-2"><Calendar size={16} /> {customer.serviceDate || "No Date"}</div>
+                                                <div className="flex items-center gap-2"><Clock size={16} /> {customer.shiftTime || "Standard"}</div>
+                                            </div>
+                                            {customer.notes && (
+                                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg inline-block">
+                                                    "{customer.notes}"
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="flex md:flex-col justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="secondary" className="!p-2 text-sm" onClick={() => handleEdit(customer)}><Edit size={16} /></Button>
+                                            <Button variant="danger" className="!p-2 text-sm" onClick={() => handleDelete(customer.id)}><Trash2 size={16} /></Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // 3. Staff Manager
+        const StaffManager = ({ staff, setStaff, postToSheet }) => {
+            const [view, setView] = useState('list');
+            const [isSaving, setIsSaving] = useState(false);
+
+            const initialForm = {
+                id: null,
+                staffName: '',
+                qualification: '',
+                rate: '',
+                availability: '', // Full-time, Part-time, Casual
+                experience: '',
+                address: '',
+                phone: '',
+                notes: '',
+                createdAt: ''
+            };
+
+            const [formData, setFormData] = useState(initialForm);
+
+            const handleEdit = (member) => {
+                setFormData(member);
+                setView('form');
+            };
+
+            const handleDelete = async (id) => {
+                if (confirm('Are you sure you want to delete this staff member?')) {
+                    try {
+                        setStaff(prev => prev.filter(s => s.id !== id));
+                        await postToSheet({
+                            sheet: 'staffs',
+                            action: 'delete',
+                            id: id
+                        });
+                    } catch (error) {
+                        console.error(error);
+                        alert("Failed to delete staff.");
+                    }
+                }
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setIsSaving(true);
+
+                try {
+                    const action = formData.id ? 'update' : 'add';
+                    const payload = {
+                        ...formData,
+                        id: formData.id || Date.now(),
+                        createdAt: formData.createdAt || new Date().toISOString()
+                    };
+
+                    await postToSheet({
+                        sheet: 'staffs',
+                        action: action,
+                        payload: payload
+                    });
+
+                    if (action === 'update') {
+                        setStaff(prev => prev.map(s => s.id === payload.id ? payload : s));
+                    } else {
+                        setStaff(prev => [payload, ...prev]);
+                    }
+
+                    setView('list');
+                    setFormData(initialForm);
+                } catch (error) {
+                    console.error("Save Error:", error);
+                    alert("Failed to save staff. " + error.message);
+                } finally {
+                    setIsSaving(false);
+                }
+            };
+
+            if (view === 'form') {
+                return (
+                    <div className="fade-in max-w-3xl mx-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
+                                {formData.id ? 'Edit Staff' : 'New Staff'}
+                            </h2>
+                            <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }}>Cancel</Button>
+                        </div>
+                        <Card>
+                            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input label="Staff Name" name="staffName" value={formData.staffName} onChange={e => setFormData({ ...formData, staffName: e.target.value })} required placeholder="e.g. Nurse Joy" />
+                                </div>
+                                <Input label="Qualification" name="qualification" value={formData.qualification} onChange={e => setFormData({ ...formData, qualification: e.target.value })} placeholder="e.g. RN, PN, NA" />
+                                <Select label="Availability" name="availability" value={formData.availability} onChange={e => setFormData({ ...formData, availability: e.target.value })}
+                                    options={[
+                                        { value: 'Full-time', label: 'Full-time' },
+                                        { value: 'Part-time', label: 'Part-time' },
+                                        { value: 'Freelance', label: 'Freelance' }
+                                    ]}
+                                />
+
+                                <Input label="Rate (THB)" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
+                                <Input label="Experience (Years)" name="experience" value={formData.experience} onChange={e => setFormData({ ...formData, experience: e.target.value })} placeholder="e.g. 5" />
+                                <Input label="Phone" type="tel" name="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="089-xxx-xxxx" />
+
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input label="Address" name="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Full address" />
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5 block">Notes</label>
+                                    <textarea
+                                        className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
+                                        rows="3"
+                                        value={formData.notes}
+                                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                        placeholder="Skills, preferences..."
+                                    ></textarea>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 flex justify-end gap-4 mt-4">
+                                    <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }} disabled={isSaving}>Cancel</Button>
+                                    <Button type="submit" disabled={isSaving}>
+                                        {isSaving ? (
+                                            <>
+                                                <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></span>
+                                                Saving...
+                                            </>
+                                        ) : 'Save Staff'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </Card>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="fade-in space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Staff Management</h2>
+                            <p className="text-slate-500 dark:text-slate-400">Manage team members and qualifications</p>
+                        </div>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> Add Staff</Button>
                     </div>
 
-                    <div className="max-w-7xl mx-auto px-4 py-6">
-                        {activeTab === 'dashboard' && <Dashboard />}
-                        {activeTab === 'customers' && <CustomerList />}
-                        {activeTab === 'staff' && <StaffList />}
-                    </div>
+                    {staff.length === 0 ? (
+                        <div className="text-center py-20 bg-white dark:bg-dark-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                            <div className="inline-flex p-4 rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 mb-4">
+                                <Briefcase size={40} />
+                            </div>
+                            <h3 className="text-lg font-medium text-slate-900 dark:text-white">No staff added</h3>
+                            <p className="text-slate-500 mb-6 max-w-sm mx-auto">Build your team by adding staff profiles to the system.</p>
+                            <Button onClick={() => setView('form')}><Plus size={20} /> Add Staff</Button>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                            {staff.map(member => (
+                                <Card key={member.id} className="relative group hover:border-brand-500/50 transition-colors flex flex-col justify-between">
+                                    <div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300">
+                                                {member.staffName.charAt(0).toUpperCase()}
+                                            </div>
+                                            <Badge color={member.availability === 'Full-time' ? 'green' : 'blue'}>
+                                                {member.availability || 'N/A'}
+                                            </Badge>
+                                        </div>
+                                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{member.staffName}</h3>
+                                        <p className="text-brand-600 dark:text-brand-400 text-sm font-medium mb-4">{member.qualification}</p>
 
-                    <div className="fixed bottom-6 right-6 flex flex-col gap-3">
-                        {activeTab === 'customers' && (
+                                        <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
+                                            <div className="flex items-center gap-2"><Briefcase size={16} /> {member.experience} Year(s) Exp.</div>
+                                            <div className="flex items-center gap-2"><MapPin size={16} /> {member.address || "No Address"}</div>
+                                            <div className="flex items-center gap-2"><Users size={16} /> {member.phone || "No Phone"}</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                        <Button variant="ghost" className="!p-2 text-sm" onClick={() => handleEdit(member)}><Edit size={16} /></Button>
+                                        <Button variant="ghost" className="!p-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(member.id)}><Trash2 size={16} /></Button>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
+        // --- Layout & Main App ---
+
+        const API_URL = "https://script.google.com/macros/s/AKfycbyAaG48aH_oGIwzTq3_F2WqCU1CaEsDB-6Ntyhmd_e8T0URWE0iOofw_jRX1fj-ZU9Cag/exec";
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [isDarkMode, setIsDarkMode] = useState(false);
+            const [isLoading, setIsLoading] = useState(true);
+            const [loadError, setLoadError] = useState(null);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+            // Data State
+            const [customers, setCustomers] = useState([]);
+            const [staff, setStaff] = useState([]);
+
+            const postToSheet = async (body) => {
+                const res = await fetch(API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "text/plain;charset=utf-8"
+                    },
+                    body: JSON.stringify(body)
+                });
+                return res.json();
+            };
+
+            // Effects: Fetch Data from Google Sheets
+            useEffect(() => {
+                const fetchData = async () => {
+                    try {
+                        setIsLoading(true);
+                        // Fetch both endpoints in parallel
+                        const [custRes, staffRes] = await Promise.all([
+                            fetch(API_URL + "?sheet=customers"),
+                            fetch(API_URL + "?sheet=staffs")
+                        ]);
+
+                        if (!custRes.ok || !staffRes.ok) throw new Error("Failed to fetch data from API");
+
+                        const custData = await custRes.json();
+                        const staffData = await staffRes.json();
+
+                        // Ensure data is array
+                        setCustomers(Array.isArray(custData) ? custData : []);
+                        setStaff(Array.isArray(staffData) ? staffData : []);
+                    } catch (err) {
+                        console.error("API Error:", err);
+                        setLoadError(err.message);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                fetchData();
+            }, []);
+
+            useEffect(() => {
+                if (isDarkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [isDarkMode]);
+
+
+
+            const NavItem = ({ id, icon, label }) => (
+                <button
+                    onClick={() => setActiveTab(id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${activeTab === id
+                        ? 'bg-brand-600 text-white shadow-lg shadow-brand-600/30'
+                        : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                >
+                    <div className={activeTab === id ? 'text-white' : 'group-hover:scale-110 transition-transform'}>
+                        {icon}
+                    </div>
+                    {isSidebarOpen && <span className="font-medium fade-in">{label}</span>}
+                </button>
+            );
+
+            return (
+                <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-300">
+                    {/* Sidebar */}
+                    <aside className={`flex-shrink-0 bg-white dark:bg-dark-950 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-all duration-300 ease-in-out ${isSidebarOpen ? 'w-64' : 'w-0 overflow-hidden border-none'}`}>
+                        <div className="p-6">
+                            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-indigo-600 whitespace-nowrap flex items-center gap-2">
+                                <Home size={28} className="text-brand-600" />
+                                อุ่นใจ โฮมแคร์
+                            </h1>
+                            <p className="text-xs text-slate-400 mt-1 font-medium tracking-wide whitespace-nowrap">ระบบจัดการข้อมูลลูกค้าและพนักงาน</p>
+                        </div>
+
+                        <nav className="flex-1 px-4 space-y-2 overflow-y-auto overflow-x-hidden">
+                            <NavItem id="dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
+                            <NavItem id="customers" icon={<Users size={20} />} label="Customers" />
+                            <NavItem id="staff" icon={<Briefcase size={20} />} label="Staff" />
+                        </nav>
+
+                        <div className="p-4 border-t border-slate-100 dark:border-slate-800">
                             <button
-                                onClick={() => setShowCustomerForm(true)}
-                                className="bg-teal-600 text-white p-4 rounded-full shadow-lg hover:bg-teal-700 transition-all hover:scale-110"
-                                title="เพิ่มลูกค้าใหม่"
+                                onClick={() => setIsDarkMode(!isDarkMode)}
+                                className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                             >
-                                <Plus size={24} />
+                                <span className="text-sm font-medium whitespace-nowrap">Theme</span>
+                                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                             </button>
-                        )}
-                        {activeTab === 'staff' && (
-                            <button
-                                onClick={() => setShowStaffForm(true)}
-                                className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all hover:scale-110"
-                                title="เพิ่มพนักงานใหม่"
-                            >
-                                <Plus size={24} />
-                            </button>
-                        )}
-                    </div>
+                        </div>
+                    </aside>
 
-                    {showCustomerForm && <CustomerForm />}
-                    {showStaffForm && <StaffForm />}
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-auto relative mainBG">
+                        {/* Header Area */}
+                        <header className="sticky top-0 z-20 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md px-8 py-4 flex justify-between items-center">
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                    className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
+                                    title={isSidebarOpen ? "Hid Sidebar" : "Show Sidebar"}
+                                >
+                                    <Menu size={24} />
+                                </button>
+                                <h1 className="text-xl font-bold text-slate-800 dark:text-white capitalize">
+                                    {activeTab}
+                                </h1>
+                            </div>
+
+                            <div className="flex items-center gap-4">
+                                <div className="text-sm text-slate-500 dark:text-slate-400">
+                                    {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </div>
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
+                                    A
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="p-8 max-w-7xl mx-auto pb-20 mainBG">
+                            {isLoading ? (
+                                <div className="flex flex-col items-center justify-center h-64 fade-in">
+                                    <div className="w-12 h-12 border-4 border-brand-200 border-t-brand-600 rounded-full animate-spin mb-4"></div>
+                                    <p className="text-slate-500 font-medium">Loading data from Cloud...</p>
+                                </div>
+                            ) : loadError ? (
+                                <div className="text-center p-10 bg-red-50 text-red-600 rounded-xl border border-red-200">
+                                    <h3 className="font-bold">Connection Error</h3>
+                                    <p>{loadError}</p>
+                                    <Button onClick={() => window.location.reload()} className="mt-4 mx-auto" variant="secondary">Retry</Button>
+                                </div>
+                            ) : (
+                                <>
+                                    {activeTab === 'dashboard' && <Dashboard customers={customers} staff={staff} />}
+                                    {activeTab === 'customers' && <CustomerManager customers={customers} setCustomers={setCustomers} postToSheet={postToSheet} />}
+                                    {activeTab === 'staff' && <StaffManager staff={staff} setStaff={setStaff} postToSheet={postToSheet} />}
+                                </>
+                            )}
+                        </div>
+                    </main>
                 </div>
             );
         };
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<OonjaiManagementSystem />);
+        root.render(<App />);
     </script>
 </body>
+
 </html>
