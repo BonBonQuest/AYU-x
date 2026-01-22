@@ -178,6 +178,10 @@
         const Menu = (props) => <Icon name="Menu" {...props} />;
         const X = (props) => <Icon name="X" {...props} />;
         const Home = (props) => <Icon name="Home" {...props} />;
+        const ChevronLeft = (props) => <Icon name="ChevronLeft" {...props} />;
+        const ChevronRight = (props) => <Icon name="ChevronRight" {...props} />;
+        const Coins = (props) => <Icon name="Coins" {...props} />;
+        const BookHeart = (props) => <Icon name="BookHeart" {...props} />;
 
 
         // --- UI Components ---
@@ -382,7 +386,6 @@
             const initialForm = {
                 id: null,
                 customerName: '',
-                age: '',
                 healthCondition: '',
                 serviceType: 'NA',
                 rate: '',
@@ -391,7 +394,8 @@
                 shiftTime: '',
                 location: '',
                 notes: '',
-                createdAt: ''
+                createdAt: '',
+                birthYear: ''
             };
 
             const [formData, setFormData] = useState(initialForm);
@@ -426,11 +430,21 @@
 
                 try {
                     const action = formData.id ? 'update' : 'add';
+
+                    // Convert Age -> BirthYear for storage
+                    const currentYear = new Date().getFullYear();
+                    const birthYear = formData.age ? (currentYear - parseInt(formData.age)) : ''; // Simple year calc
+
                     const payload = {
                         ...formData,
+                        birthYear: birthYear, // Send birthYear
                         id: formData.id || Date.now(),
                         createdAt: formData.createdAt || new Date().toISOString()
                     };
+
+                    // Remove age from payload if backend strictly doesn't want it, 
+                    // but keeping it might be safe unless schema is strict.
+                    // Let's assume we just attach birthYear and existing backend ignores extra fields or we overwrite.
 
                     await postToSheet({
                         sheet: 'customers',
@@ -439,9 +453,9 @@
                     });
 
                     if (action === 'update') {
-                        setCustomers(prev => prev.map(c => c.id === payload.id ? payload : c));
+                        setCustomers(prev => prev.map(c => c.id === payload.id ? formData : c)); // Update local state with formData (which has age)
                     } else {
-                        setCustomers(prev => [payload, ...prev]);
+                        setCustomers(prev => [formData, ...prev]); // Add formData (which has age) to local state
                     }
 
                     setView('list');
@@ -488,7 +502,8 @@
                                     <Select label="Shift" name="shift" value={formData.shift} onChange={e => setFormData({ ...formData, shift: e.target.value })}
                                         options={[
                                             { value: 'D', label: 'Day (D)' },
-                                            { value: 'N', label: 'Night (N)' }
+                                            { value: 'N', label: 'Night (N)' },
+                                            { value: 'F', label: 'Full-Time (F)' }
                                         ]}
                                     />
                                     <Input label="Shift Time" name="shiftTime" value={formData.shiftTime} onChange={e => setFormData({ ...formData, shiftTime: e.target.value })} placeholder="e.g. 08:00 - 16:00" />
@@ -552,14 +567,20 @@
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3 mb-2">
                                                 <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName}</h3>
-                                                <Badge color={customer.shift === 'D' ? 'amber' : 'purple'}>{customer.shift === 'D' ? 'Day' : 'Night'}</Badge>
+                                                <Badge color={customer.shift === 'D' ? 'amber' : (customer.shift === 'N' ? 'purple' : (customer.shift === 'F' ? 'green' : 'blue'))}>
+                                                    {customer.shift === 'D' ? 'Day' : (customer.shift === 'N' ? 'Night' : (customer.shift === 'F' ? 'Full-Time' : customer.shift))}
+                                                </Badge>
                                                 <Badge color="blue">{customer.serviceType}</Badge>
                                             </div>
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
-                                                <div className="flex items-center gap-2"><Activity size={16} /> Age: {customer.age}</div>
-                                                <div className="flex items-center gap-2"><MapPin size={16} /> {customer.location || "No location"}</div>
-                                                <div className="flex items-center gap-2"><Calendar size={16} /> {customer.serviceDate || "No Date"}</div>
-                                                <div className="flex items-center gap-2"><Clock size={16} /> {customer.shiftTime || "Standard"}</div>
+                                                <div className="flex items-center gap-2"><Activity size={16} /> อายุ: {customer.age}</div>
+                                                <div className="flex items-center gap-2"><BookHeart size={16} />  อาการ: {customer.healthCondition || "ไม่มีอาการ"}</div>
+                                                <div className="flex items-center gap-2"><Coins size={16} />  ราคา: {customer.rate || "ไม่มีราคา"}</div>
+                                                <div className="flex items-center gap-2"><Calendar size={16} /> วันเริ่มใช้บริการ: {customer.serviceDate || "No Date"}</div>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
+                                                <div className="flex items-center gap-2 md:col-span-3"><MapPin size={16} /> สถานที่ให้บริการ: {customer.location || "No location"}</div>
+                                                <div className="flex items-center gap-2"><Calendar size={16} />  อัพเดทล่าสุด: {customer.shiftTime || "Standard"}</div>
                                             </div>
                                             {customer.notes && (
                                                 <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg inline-block">
@@ -769,6 +790,283 @@
         };
 
 
+        // 4. Nurse Roster Component
+        const NurseRoster = ({ staff, roster, setRoster }) => {
+            const [currentDate, setCurrentDate] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(null);
+            const [isModalOpen, setIsModalOpen] = useState(false);
+
+            // Temporary state for the modal form - for adding NEW shift
+            const [newShift, setNewShift] = useState({
+                nurseId: '',
+                shiftType: 'D'
+            });
+
+            // Helper to get days in month
+            const getDaysInMonth = (year, month) => {
+                return new Date(year, month + 1, 0).getDate();
+            };
+
+            const getFirstDayOfMonth = (year, month) => {
+                return new Date(year, month, 1).getDay();
+            };
+
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const daysInMonth = getDaysInMonth(year, month);
+            const firstDay = getFirstDayOfMonth(year, month);
+
+            const monthNames = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            ];
+
+            const handlePrevMonth = () => {
+                setCurrentDate(new Date(year, month - 1, 1));
+            };
+
+            const handleNextMonth = () => {
+                setCurrentDate(new Date(year, month + 1, 1));
+            };
+
+            const handleDayClick = (day) => {
+                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                setSelectedDate(dateKey);
+                setNewShift({ nurseId: '', shiftType: 'D' }); // Reset form
+                setIsModalOpen(true);
+            };
+
+            const handleAddShift = () => {
+                if (!selectedDate || !newShift.nurseId) return;
+
+                const nurse = staff.find(s => s.id.toString() === newShift.nurseId);
+                if (!nurse) return;
+
+                const currentShifts = roster[selectedDate] || [];
+
+                // Check for duplicate nurse on same day
+                if (currentShifts.some(s => s.nurseId.toString() === newShift.nurseId)) {
+                    alert('This nurse is already assigned to this day.');
+                    return;
+                }
+
+                const updatedShifts = [...currentShifts, {
+                    ...newShift,
+                    nurseName: nurse.staffName
+                }];
+
+                setRoster(prev => ({
+                    ...prev,
+                    [selectedDate]: updatedShifts
+                }));
+
+                // Reset form but keep modal open to add more
+                setNewShift({ ...newShift, nurseId: '' });
+            };
+
+            const handleRemoveShift = (nurseId) => {
+                if (!selectedDate) return;
+                const currentShifts = roster[selectedDate] || [];
+                const updatedShifts = currentShifts.filter(s => s.nurseId.toString() !== nurseId.toString());
+
+                if (updatedShifts.length === 0) {
+                    const newRoster = { ...roster };
+                    delete newRoster[selectedDate];
+                    setRoster(newRoster);
+                } else {
+                    setRoster(prev => ({
+                        ...prev,
+                        [selectedDate]: updatedShifts
+                    }));
+                }
+            };
+
+            const currentDayShifts = selectedDate ? (roster[selectedDate] || []) : [];
+
+            return (
+                <div className="fade-in space-y-6">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Nurse Roster</h2>
+                        <p className="text-slate-500 dark:text-slate-400">Manage daily shifts and assignments</p>
+                    </div>
+
+                    <Card>
+                        {/* Calendar Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Calendar size={24} className="text-brand-600" />
+                                {monthNames[month]} {year}
+                            </h3>
+                            <div className="flex gap-2">
+                                <Button variant="secondary" onClick={handlePrevMonth}><ChevronLeft size={20} /></Button>
+                                <Button variant="secondary" onClick={() => setCurrentDate(new Date())}>Today</Button>
+                                <Button variant="secondary" onClick={handleNextMonth}><ChevronRight size={20} /></Button>
+                            </div>
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div className="grid grid-cols-7 gap-2 mb-2 text-center">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                <div key={day} className="font-semibold text-slate-500 text-sm uppercase tracking-wider py-2">
+                                    {day}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 gap-2">
+                            {/* Empty cells for previous month */}
+                            {[...Array(firstDay)].map((_, i) => (
+                                <div key={`empty-${i}`} className="h-32 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl" />
+                            ))}
+
+                            {/* Days */}
+                            {[...Array(daysInMonth)].map((_, i) => {
+                                const day = i + 1;
+                                const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                const shifts = roster[dateKey] || [];
+                                const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
+
+                                return (
+                                    <div
+                                        key={day}
+                                        onClick={() => handleDayClick(day)}
+                                        className={`h-32 p-2 rounded-xl border transition-all cursor-pointer relative group overflow-hidden
+                                            ${isToday ? 'border-brand-500 bg-brand-50/30 dark:bg-brand-900/10' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-dark-800 hover:border-brand-300 dark:hover:border-slate-600'}
+                                        `}
+                                    >
+                                        <div className={`text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1
+                                            ${isToday ? 'bg-brand-500 text-white' : 'text-slate-700 dark:text-slate-300'}
+                                        `}>
+                                            {day}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1 max-h-[85px] overflow-y-auto no-scrollbar">
+                                            {shifts.map((shift, idx) => (
+                                                <div key={idx} className={`text-xs p-1 rounded-md font-medium truncate flex items-center gap-1
+                                                    ${shift.shiftType === 'D' ? 'bg-amber-100 text-amber-800' :
+                                                        shift.shiftType === 'N' ? 'bg-indigo-100 text-indigo-800' :
+                                                            'bg-emerald-100 text-emerald-800'}
+                                                `}>
+                                                    <span className="font-bold text-[10px]">
+                                                        {shift.shiftType === 'D' ? '☀' : shift.shiftType === 'N' ? '☾' : '24h'}
+                                                    </span>
+                                                    {shift.nurseName}
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Hover Add Button */}
+                                        {shifts.length === 0 && (
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-slate-50/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-[1px]">
+                                                <div className="bg-brand-100 text-brand-600 p-1.5 rounded-full"><Plus size={20} /></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </Card>
+
+                    {/* Shift Edit Modal Overlay */}
+                    {isModalOpen && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 fade-in">
+                            <div className="bg-white dark:bg-dark-900 w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 transform transition-all scale-100">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">
+                                        Assign Shifts for {selectedDate}
+                                    </h3>
+                                    <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                        <X size={24} />
+                                    </button>
+                                </div>
+
+                                {/* Current Assignments */}
+                                <div className="mb-6">
+                                    <h4 className="text-sm font-semibold text-slate-500 mb-3 uppercase tracking-wider">Current Assignments</h4>
+                                    {currentDayShifts.length === 0 ? (
+                                        <p className="text-slate-400 text-sm italic">No nurses assigned yet.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {currentDayShifts.map((shift, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-dark-800 border border-slate-100 dark:border-slate-800">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold
+                                                            ${shift.shiftType === 'D' ? 'bg-amber-100 text-amber-700' :
+                                                                shift.shiftType === 'N' ? 'bg-indigo-100 text-indigo-700' :
+                                                                    'bg-emerald-100 text-emerald-700'}
+                                                        `}>
+                                                            {shift.shiftType}
+                                                        </span>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-200">{shift.nurseName}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRemoveShift(shift.nurseId)}
+                                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <hr className="border-slate-100 dark:border-slate-800 my-4" />
+
+                                {/* Add New Assignment */}
+                                <div className="space-y-4">
+                                    <h4 className="text-sm font-semibold text-slate-500 mb-2 uppercase tracking-wider">Add New Assignment</h4>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1.5">Select Nurse</label>
+                                        <select
+                                            className="w-full px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-brand-500/20"
+                                            value={newShift.nurseId}
+                                            onChange={e => setNewShift({ ...newShift, nurseId: e.target.value })}
+                                        >
+                                            <option value="">-- Choose Nurse --</option>
+                                            {staff.filter(s => !currentDayShifts.some(assigned => assigned.nurseId.toString() === s.id.toString())).map(s => (
+                                                <option key={s.id} value={s.id}>{s.staffName} ({s.qualification})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-500 mb-1.5">Shift Type</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['D', 'N', 'FD'].map((type) => (
+                                                <button
+                                                    key={type}
+                                                    onClick={() => setNewShift({ ...newShift, shiftType: type })}
+                                                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-all ${newShift.shiftType === type
+                                                        ? 'bg-brand-50 border-brand-500 text-brand-700 ring-1 ring-brand-500'
+                                                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                                                        }`}
+                                                >
+                                                    {type === 'D' ? 'Morning (D)' : type === 'N' ? 'Night (N)' : 'Full Day'}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <Button
+                                        variant="primary"
+                                        className="w-full justify-center mt-2"
+                                        onClick={handleAddShift}
+                                        disabled={!newShift.nurseId}
+                                    >
+                                        <Plus size={18} /> Add Assignment
+                                    </Button>
+                                </div>
+
+                                <div className="mt-8 flex justify-end">
+                                    <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Done</Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+
         // --- Layout & Main App ---
 
         const API_URL = "https://script.google.com/macros/s/AKfycbyAaG48aH_oGIwzTq3_F2WqCU1CaEsDB-6Ntyhmd_e8T0URWE0iOofw_jRX1fj-ZU9Cag/exec";
@@ -783,6 +1081,7 @@
             // Data State
             const [customers, setCustomers] = useState([]);
             const [staff, setStaff] = useState([]);
+            const [roster, setRoster] = useState({}); // Date -> { nurseId, shiftType, nurseName }
 
             const postToSheet = async (body) => {
                 const res = await fetch(API_URL, {
@@ -811,8 +1110,28 @@
                         const custData = await custRes.json();
                         const staffData = await staffRes.json();
 
-                        // Ensure data is array
-                        setCustomers(Array.isArray(custData) ? custData : []);
+                        // เพิ่มเรื่องอายุโดยการคำนวนจาก birthYear
+                        const processedCustomers = Array.isArray(custData) ? custData.map(c => {
+                            // Calculate Age from BirthYear if Age is missing or we prefer BirthYear
+                            if (c.birthYear && !c.age) {
+                                return {
+                                    ...c,
+                                    age: new Date().getFullYear() - parseInt(c.birthYear)
+                                };
+                            }
+                            // If age exists, keep it, or prefer birthYear calculation?
+                            // User asked: "get data to show age... by subtracting current year with birthYear"
+                            // So we should calculate it.
+                            if (c.birthYear) {
+                                return {
+                                    ...c,
+                                    age: new Date().getFullYear() - parseInt(c.birthYear)
+                                };
+                            }
+                            return c;
+                        }) : [];
+
+                        setCustomers(processedCustomers);
                         setStaff(Array.isArray(staffData) ? staffData : []);
                     } catch (err) {
                         console.error("API Error:", err);
@@ -866,6 +1185,7 @@
                             <NavItem id="dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
                             <NavItem id="customers" icon={<Users size={20} />} label="Customers" />
                             <NavItem id="staff" icon={<Briefcase size={20} />} label="Staff" />
+                            <NavItem id="roster" icon={<Calendar size={20} />} label="Nurse Roster" />
                         </nav>
 
                         <div className="p-4 border-t border-slate-100 dark:border-slate-800">
@@ -923,6 +1243,7 @@
                                     {activeTab === 'dashboard' && <Dashboard customers={customers} staff={staff} />}
                                     {activeTab === 'customers' && <CustomerManager customers={customers} setCustomers={setCustomers} postToSheet={postToSheet} />}
                                     {activeTab === 'staff' && <StaffManager staff={staff} setStaff={setStaff} postToSheet={postToSheet} />}
+                                    {activeTab === 'roster' && <NurseRoster staff={staff} roster={roster} setRoster={setRoster} />}
                                 </>
                             )}
                         </div>
