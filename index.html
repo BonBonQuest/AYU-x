@@ -182,6 +182,7 @@
         const ChevronRight = (props) => <Icon name="ChevronRight" {...props} />;
         const Coins = (props) => <Icon name="Coins" {...props} />;
         const BookHeart = (props) => <Icon name="BookHeart" {...props} />;
+        const ChevronDown = (props) => <Icon name="ChevronDown" {...props} />;
 
 
         // --- UI Components ---
@@ -217,7 +218,7 @@
                     onChange={onChange}
                     required={required}
                     placeholder={placeholder}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
+                    className="w-full h-[46px] px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white appearance-none"
                 />
             </div>
         );
@@ -225,18 +226,23 @@
         const Select = ({ label, name, value, onChange, options, required = false }) => (
             <div className="flex flex-col gap-1.5">
                 {label && <label className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</label>}
-                <select
-                    name={name}
-                    value={value}
-                    onChange={onChange}
-                    required={required}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
-                >
-                    <option value="" disabled>Select {label}</option>
-                    {options.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                </select>
+                <div className="relative">
+                    <select
+                        name={name}
+                        value={value}
+                        onChange={onChange}
+                        required={required}
+                        className="w-full h-[46px] px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white appearance-none pr-10"
+                    >
+                        <option value="" disabled>Select {label}</option>
+                        {options.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                        <ChevronDown size={18} />
+                    </div>
+                </div>
             </div>
         );
 
@@ -382,10 +388,13 @@
         const CustomerManager = ({ customers, setCustomers, postToSheet }) => {
             const [view, setView] = useState('list'); // 'list' | 'form'
             const [isSaving, setIsSaving] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
+            const [showActiveOnly, setShowActiveOnly] = useState(false);
 
             const initialForm = {
                 id: null,
                 customerName: '',
+                birthYear: '',
                 healthCondition: '',
                 serviceType: 'NA',
                 rate: '',
@@ -395,13 +404,30 @@
                 location: '',
                 notes: '',
                 createdAt: '',
-                birthYear: ''
             };
 
             const [formData, setFormData] = useState(initialForm);
 
             const handleEdit = (customer) => {
-                setFormData(customer);
+                let normalizedDate = customer.serviceDate || "";
+                if (normalizedDate) {
+                    try {
+                        const d = new Date(normalizedDate);
+                        if (!isNaN(d.getTime())) {
+                            // Use local components to avoid timezone shifting
+                            const y = d.getFullYear();
+                            const m = String(d.getMonth() + 1).padStart(2, '0');
+                            const day = String(d.getDate()).padStart(2, '0');
+                            normalizedDate = `${y}-${m}-${day}`;
+                        }
+                    } catch (e) {
+                        console.warn("Date normalization failed", e);
+                    }
+                }
+                setFormData({
+                    ...customer,
+                    serviceDate: normalizedDate
+                });
                 setView('form');
             };
 
@@ -435,16 +461,21 @@
                     const currentYear = new Date().getFullYear();
                     const birthYear = formData.age ? (currentYear - parseInt(formData.age)) : ''; // Simple year calc
 
+                    // Strict Payload Construction: Ensure 'age' is NEVER sent to the database
                     const payload = {
-                        ...formData,
-                        birthYear: birthYear, // Send birthYear
                         id: formData.id || Date.now(),
+                        customerName: formData.customerName,
+                        birthYear: birthYear,
+                        healthCondition: formData.healthCondition,
+                        serviceType: formData.serviceType,
+                        rate: formData.rate,
+                        serviceDate: formData.serviceDate,
+                        shift: formData.shift,
+                        shiftTime: formData.shiftTime,
+                        location: formData.location,
+                        notes: formData.notes,
                         createdAt: formData.createdAt || new Date().toISOString()
                     };
-
-                    // Remove age from payload if backend strictly doesn't want it, 
-                    // but keeping it might be safe unless schema is strict.
-                    // Let's assume we just attach birthYear and existing backend ignores extra fields or we overwrite.
 
                     await postToSheet({
                         sheet: 'customers',
@@ -494,10 +525,6 @@
                                     ]}
                                 />
 
-                                <Input label="Rate (THB)" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
-
-                                <Input label="Service Date" type="date" name="serviceDate" value={formData.serviceDate} onChange={e => setFormData({ ...formData, serviceDate: e.target.value })} />
-
                                 <div className="grid grid-cols-2 gap-4">
                                     <Select label="Shift" name="shift" value={formData.shift} onChange={e => setFormData({ ...formData, shift: e.target.value })}
                                         options={[
@@ -506,8 +533,13 @@
                                             { value: 'F', label: 'Full-Time (F)' }
                                         ]}
                                     />
-                                    <Input label="Shift Time" name="shiftTime" value={formData.shiftTime} onChange={e => setFormData({ ...formData, shiftTime: e.target.value })} placeholder="e.g. 08:00 - 16:00" />
+                                    <Input label="Rate (THB)" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
                                 </div>
+
+                                <Input label="Service Date" type="date" name="serviceDate" value={formData.serviceDate} onChange={e => setFormData({ ...formData, serviceDate: e.target.value })} />
+
+                                <Input label="Shift Time" type="number" name="shiftTime" value={formData.shiftTime} onChange={e => setFormData({ ...formData, shiftTime: e.target.value })} placeholder="e.g. 7 days" />
+
 
                                 <div className="col-span-1 md:col-span-2">
                                     <Input label="Location / Address" name="location" value={formData.location} onChange={e => setFormData({ ...formData, location: e.target.value })} placeholder="Address or Room No." />
@@ -544,10 +576,35 @@
                 <div className="fade-in space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Customers</h2>
-                            <p className="text-slate-500 dark:text-slate-400">Manage patient and client records</p>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">ระบบจัดการลูกค้า</h2>
+                            <p className="text-slate-500 dark:text-slate-400">จัดการรายชื่อขัอมูลลูกค้าและการบริการ</p>
                         </div>
-                        <Button onClick={() => setView('form')}><Plus size={20} /> Add Customer</Button>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> เพื่มบริการลูกค้าใหม่</Button>
+                    </div>
+
+                    <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+                        <div className="relative flex-1">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <Search size={20} />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder="ค้นหารายชื่อลูกค้า..."
+                                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white shadow-sm"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                        </div>
+                        <button
+                            onClick={() => setShowActiveOnly(!showActiveOnly)}
+                            className={`flex items-center gap-2 px-4 py-3 rounded-xl border transition-all duration-200 font-medium whitespace-nowrap shadow-sm ${showActiveOnly
+                                ? 'bg-emerald-500 border-emerald-600 text-white active-shadow'
+                                : 'bg-white dark:bg-dark-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                }`}
+                        >
+                            <Activity size={18} />
+                            เฉพาะที่กำลังให้บริการ
+                        </button>
                     </div>
 
                     {customers.length === 0 ? (
@@ -561,40 +618,111 @@
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 gap-4">
-                            {customers.map(customer => (
-                                <Card key={customer.id} className="group hover:border-brand-500/50 transition-colors">
-                                    <div className="flex flex-col md:flex-row justify-between gap-4">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName}</h3>
-                                                <Badge color={customer.shift === 'D' ? 'amber' : (customer.shift === 'N' ? 'purple' : (customer.shift === 'F' ? 'green' : 'blue'))}>
-                                                    {customer.shift === 'D' ? 'Day' : (customer.shift === 'N' ? 'Night' : (customer.shift === 'F' ? 'Full-Time' : customer.shift))}
-                                                </Badge>
-                                                <Badge color="blue">{customer.serviceType}</Badge>
+                            {[...customers]
+                                .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                                .filter(customer => {
+                                    // Base search filter
+                                    const matchesSearch = customer.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        (customer.location && customer.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                                        (customer.healthCondition && customer.healthCondition.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                                        (customer.notes && customer.notes.toLowerCase().includes(searchQuery.toLowerCase()));
+
+                                    if (!matchesSearch) return false;
+
+                                    // Active only filter
+                                    if (showActiveOnly) {
+                                        const serviceStartDate = new Date(customer.serviceDate);
+                                        const careDays = parseInt(customer.shiftTime) || 0;
+                                        const serviceEndDate = new Date(serviceStartDate);
+                                        serviceEndDate.setDate(serviceStartDate.getDate() + careDays);
+
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+
+                                        const hasData = customer.serviceDate && customer.shiftTime;
+                                        const isExpired = hasData && today > serviceEndDate;
+
+                                        return !isExpired && hasData;
+                                    }
+
+                                    return true;
+                                })
+                                .map(customer => {
+                                    const serviceStartDate = new Date(customer.serviceDate);
+                                    const careDays = parseInt(customer.shiftTime) || 0;
+                                    const serviceEndDate = new Date(serviceStartDate);
+                                    serviceEndDate.setDate(serviceStartDate.getDate() + careDays);
+
+                                    const today = new Date();
+                                    today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+                                    const hasData = customer.serviceDate && customer.shiftTime;
+                                    const isExpired = hasData && today > serviceEndDate;
+
+                                    const statusClasses = isExpired
+                                        ? "bg-red-50/80 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                                        : (hasData ? "bg-emerald-50/80 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" : "");
+
+                                    return (
+                                        <Card key={customer.id} className={`group hover:border-brand-500/50 transition-all duration-300 ${statusClasses}`}>
+                                            <div className="flex flex-col md:flex-row justify-between gap-4">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName}</h3>
+                                                            <Badge color={customer.shift === 'D' ? 'amber' : (customer.shift === 'N' ? 'purple' : (customer.shift === 'F' ? 'green' : 'blue'))}>
+                                                                {customer.shift === 'D' ? 'Day' : (customer.shift === 'N' ? 'Night' : (customer.shift === 'F' ? 'Full-Time' : customer.shift))}
+                                                            </Badge>
+                                                            <Badge color="blue">{customer.serviceType}</Badge>
+                                                        </div>
+                                                        <Button
+                                                            variant="primary"
+                                                            className="hidden md:flex !px-3 !py-1 text-xs font-semibold gap-1"
+                                                            onClick={() => handleEdit(customer)}
+                                                        >
+                                                            <Plus size={14} /> เพิ่มบริการลูกค้า
+                                                        </Button>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
+                                                        <div className="flex items-center gap-2"><Activity size={16} /> อายุ: {customer.age}</div>
+                                                        <div className="flex items-center gap-2"><BookHeart size={16} />  อาการ: {customer.healthCondition || "ไม่มีอาการ"}</div>
+                                                        <div className="flex items-center gap-2"><Calendar size={16} />  จำนวนวันที่ดูแล: {customer.shiftTime || "1 วัน"}</div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar size={16} /> วันเริ่มใช้บริการ: {(() => {
+                                                                if (!customer.serviceDate) return "ไม่มีข้อมูล";
+                                                                // Strip time if present (T or space)
+                                                                const dateOnly = customer.serviceDate.split(/[T ]/)[0];
+                                                                const parts = dateOnly.split('-');
+                                                                if (parts.length === 3) {
+                                                                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                                                                }
+                                                                return dateOnly;
+                                                            })()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
+                                                        <div className="flex items-center gap-2 md:col-span-3"><MapPin size={16} /> สถานที่ให้บริการ: {customer.location || "No location"}</div>
+                                                        <div className="flex items-center gap-2">
+                                                            <Coins size={16} />  สถานะ:
+                                                            <span className={`font-bold ${isExpired ? 'text-red-600 dark:text-red-400' : (hasData ? 'text-emerald-600 dark:text-emerald-400' : '')}`}>
+                                                                {isExpired ? "จบงาน" : (hasData ? "กำลังให้บริการ" : "-")}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    {customer.notes && (
+                                                        <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg inline-block">
+                                                            "{customer.notes}"
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div className="flex md:flex-col justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Button variant="secondary" className="!p-2 text-sm" onClick={() => handleEdit(customer)}><Edit size={16} /></Button>
+                                                    <Button variant="danger" className="!p-2 text-sm" onClick={() => handleDelete(customer.id)}><Trash2 size={16} /></Button>
+                                                </div>
                                             </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
-                                                <div className="flex items-center gap-2"><Activity size={16} /> อายุ: {customer.age}</div>
-                                                <div className="flex items-center gap-2"><BookHeart size={16} />  อาการ: {customer.healthCondition || "ไม่มีอาการ"}</div>
-                                                <div className="flex items-center gap-2"><Coins size={16} />  ราคา: {customer.rate || "ไม่มีราคา"}</div>
-                                                <div className="flex items-center gap-2"><Calendar size={16} /> วันเริ่มใช้บริการ: {customer.serviceDate || "No Date"}</div>
-                                            </div>
-                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
-                                                <div className="flex items-center gap-2 md:col-span-3"><MapPin size={16} /> สถานที่ให้บริการ: {customer.location || "No location"}</div>
-                                                <div className="flex items-center gap-2"><Calendar size={16} />  อัพเดทล่าสุด: {customer.shiftTime || "Standard"}</div>
-                                            </div>
-                                            {customer.notes && (
-                                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg inline-block">
-                                                    "{customer.notes}"
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="flex md:flex-col justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="secondary" className="!p-2 text-sm" onClick={() => handleEdit(customer)}><Edit size={16} /></Button>
-                                            <Button variant="danger" className="!p-2 text-sm" onClick={() => handleDelete(customer.id)}><Trash2 size={16} /></Button>
-                                        </div>
-                                    </div>
-                                </Card>
-                            ))}
+                                        </Card>
+                                    );
+                                })}
                         </div>
                     )}
                 </div>
@@ -739,10 +867,10 @@
                 <div className="fade-in space-y-6">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Staff Management</h2>
-                            <p className="text-slate-500 dark:text-slate-400">Manage team members and qualifications</p>
+                            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">ระบบจัดการพนักงาน</h2>
+                            <p className="text-slate-500 dark:text-slate-400">จัดการรายชื่อพนักงานและข้อมูลพนักงาน</p>
                         </div>
-                        <Button onClick={() => setView('form')}><Plus size={20} /> Add Staff</Button>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> เพื่มพนักงานใหม่</Button>
                     </div>
 
                     {staff.length === 0 ? (
@@ -1081,7 +1209,7 @@
             // Data State
             const [customers, setCustomers] = useState([]);
             const [staff, setStaff] = useState([]);
-            const [roster, setRoster] = useState({}); // Date -> { nurseId, shiftType, nurseName }
+            const [roster, setRoster] = useState({}); // Date -> {nurseId, shiftType, nurseName}
 
             const postToSheet = async (body) => {
                 const res = await fetch(API_URL, {
@@ -1183,9 +1311,9 @@
 
                         <nav className="flex-1 px-4 space-y-2 overflow-y-auto overflow-x-hidden">
                             <NavItem id="dashboard" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-                            <NavItem id="customers" icon={<Users size={20} />} label="Customers" />
-                            <NavItem id="staff" icon={<Briefcase size={20} />} label="Staff" />
-                            <NavItem id="roster" icon={<Calendar size={20} />} label="Nurse Roster" />
+                            <NavItem id="customers" icon={<Users size={20} />} label="ระบบจัดการลูกค้า" />
+                            <NavItem id="staff" icon={<Briefcase size={20} />} label="ระบบจัดการพนักงาน" />
+                            <NavItem id="roster" icon={<Calendar size={20} />} label="ตารางงานพนักงาน" />
                         </nav>
 
                         <div className="p-4 border-t border-slate-100 dark:border-slate-800">
