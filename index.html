@@ -348,7 +348,7 @@
                                                 </div>
                                                 <div>
                                                     <p className="font-medium text-slate-800 dark:text-slate-200">{c.customerName}</p>
-                                                    <p className="text-xs text-slate-500">{c.serviceType} • {c.location}</p>
+                                                    <p className="text-xs text-slate-500">{c.serviceType} • {c.healthCondition}</p>
                                                 </div>
                                             </div>
                                             <span className="text-xs text-slate-400">
@@ -390,6 +390,7 @@
             const [isSaving, setIsSaving] = useState(false);
             const [searchQuery, setSearchQuery] = useState('');
             const [showActiveOnly, setShowActiveOnly] = useState(false);
+            const [formTitle, setFormTitle] = useState('สร้างบริการลูกค้าใหม่');
 
             const initialForm = {
                 id: null,
@@ -408,7 +409,8 @@
 
             const [formData, setFormData] = useState(initialForm);
 
-            const handleEdit = (customer) => {
+            const handleEdit = (customer, title = 'Edit Customer') => {
+                setFormTitle(title);
                 let normalizedDate = customer.serviceDate || "";
                 if (normalizedDate) {
                     try {
@@ -435,12 +437,35 @@
                 if (confirm('Are you sure you want to delete this customer?')) {
                     try {
                         const originalCustomers = [...customers];
-                        setCustomers(prev => prev.filter(c => c.id !== id)); // Optimistic update
+                        const c = customers.find(item => item.id === id);
+                        if (!c) return;
+
+                        setCustomers(prev => prev.filter(item => item.id !== id)); // Optimistic update
+
+                        // Convert Age -> BirthYear for storage consistency
+                        const currentYear = new Date().getFullYear();
+                        const birthYear = c.age ? (currentYear - parseInt(c.age)) : '';
+
+                        const payload = {
+                            id: c.id,
+                            customerName: c.customerName,
+                            birthYear: birthYear,
+                            healthCondition: c.healthCondition,
+                            serviceType: c.serviceType,
+                            rate: c.rate,
+                            serviceDate: c.serviceDate ? c.serviceDate.split(/[T ]/)[0] : "",
+                            shift: c.shift,
+                            shiftTime: c.shiftTime,
+                            location: c.location,
+                            notes: c.notes,
+                            createdAt: c.createdAt,
+                            serviceCode: c.serviceCode
+                        };
 
                         await postToSheet({
                             sheet: 'customers',
                             action: 'delete',
-                            payload: { id }
+                            payload: payload
                         });
                     } catch (error) {
                         alert('Failed to delete. Please try again.');
@@ -455,13 +480,41 @@
                 setIsSaving(true);
 
                 try {
-                    const action = formData.id ? 'update' : 'add';
+                    let action = "add";
+                    if (formData.id) {
+                        if (formTitle === "แก้ไขบริการลูกค้า") {
+                            action = "edit";
+                        } else {
+                            action = "update";
+                        }
+                    }
 
                     // Convert Age -> BirthYear for storage
                     const currentYear = new Date().getFullYear();
                     const birthYear = formData.age ? (currentYear - parseInt(formData.age)) : ''; // Simple year calc
 
-                    // Strict Payload Construction: Ensure 'age' is NEVER sent to the database
+                    // Generate Service Code for Add or Update
+                    let serviceCode = formData.serviceCode;
+                    if (action === "add" || action === "update") {
+                        const prefixes = {
+                            'NA': 'NA',
+                            'Caregiver': 'CG',
+                            'Nurse': 'RN',
+                            'Therapy': 'TH'
+                        };
+                        const prefix = prefixes[formData.serviceType] || 'SV';
+                        const randomPart = Math.random().toString(36).substring(2, 6).toUpperCase();
+                        serviceCode = `${prefix}-${randomPart}`;
+                    }
+
+                    const serviceDate = formData.serviceDate || (() => {
+                        const now = new Date();
+                        const y = now.getFullYear();
+                        const m = String(now.getMonth() + 1).padStart(2, '0');
+                        const day = String(now.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${day}`;
+                    })();
+
                     const payload = {
                         id: formData.id || Date.now(),
                         customerName: formData.customerName,
@@ -469,12 +522,13 @@
                         healthCondition: formData.healthCondition,
                         serviceType: formData.serviceType,
                         rate: formData.rate,
-                        serviceDate: formData.serviceDate,
+                        serviceDate: serviceDate,
                         shift: formData.shift,
                         shiftTime: formData.shiftTime,
                         location: formData.location,
                         notes: formData.notes,
-                        createdAt: formData.createdAt || new Date().toISOString()
+                        createdAt: formData.createdAt || new Date().toISOString(),
+                        serviceCode: serviceCode
                     };
 
                     await postToSheet({
@@ -483,17 +537,17 @@
                         payload: payload
                     });
 
-                    if (action === 'update') {
-                        setCustomers(prev => prev.map(c => c.id === payload.id ? formData : c)); // Update local state with formData (which has age)
+                    if (action === 'update' || action === 'edit') {
+                        setCustomers(prev => prev.map(c => c.id === payload.id ? { ...formData, ...payload } : c)); //Merge ข้อมูลใหม่อีกครั้งก่อน set
                     } else {
-                        setCustomers(prev => [formData, ...prev]); // Add formData (which has age) to local state
+                        setCustomers(prev => [{ ...formData, ...payload }, ...prev]); //Merge ข้อมูลใหม่อีกครั้งก่อน set
                     }
 
                     setView('list');
                     setFormData(initialForm);
                 } catch (error) {
                     console.error("Save Error:", error);
-                    alert("Failed to save data. " + error.message);
+                    alert("Failed to " + action + " data. " + error.message);
                 } finally {
                     setIsSaving(false);
                 }
@@ -504,7 +558,7 @@
                     <div className="fade-in max-w-3xl mx-auto">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-                                {formData.id ? 'Edit Customer' : 'New Customer'}
+                                {formTitle}
                             </h2>
                             <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }}>Cancel</Button>
                         </div>
@@ -579,7 +633,7 @@
                             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">ระบบจัดการลูกค้า</h2>
                             <p className="text-slate-500 dark:text-slate-400">จัดการรายชื่อขัอมูลลูกค้าและการบริการ</p>
                         </div>
-                        <Button onClick={() => setView('form')}><Plus size={20} /> เพื่มบริการลูกค้าใหม่</Button>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> สร้างบริการลูกค้าใหม่</Button>
                     </div>
 
                     <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
@@ -623,6 +677,7 @@
                                 .filter(customer => {
                                     // Base search filter
                                     const matchesSearch = customer.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                        (customer.serviceCode && String(customer.serviceCode).toLowerCase().includes(searchQuery.toLowerCase())) ||
                                         (customer.location && customer.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
                                         (customer.healthCondition && customer.healthCondition.toLowerCase().includes(searchQuery.toLowerCase())) ||
                                         (customer.notes && customer.notes.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -669,7 +724,7 @@
                                                 <div className="flex-1">
                                                     <div className="flex items-center justify-between gap-3 mb-2">
                                                         <div className="flex items-center gap-3">
-                                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName}</h3>
+                                                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">{customer.customerName} ({customer.serviceCode || 'N/A'})</h3>
                                                             <Badge color={customer.shift === 'D' ? 'amber' : (customer.shift === 'N' ? 'purple' : (customer.shift === 'F' ? 'green' : 'blue'))}>
                                                                 {customer.shift === 'D' ? 'Day' : (customer.shift === 'N' ? 'Night' : (customer.shift === 'F' ? 'Full-Time' : customer.shift))}
                                                             </Badge>
@@ -678,7 +733,7 @@
                                                         <Button
                                                             variant="primary"
                                                             className="hidden md:flex !px-3 !py-1 text-xs font-semibold gap-1"
-                                                            onClick={() => handleEdit(customer)}
+                                                            onClick={() => handleEdit(customer, 'เพิ่มบริการลูกค้า')}
                                                         >
                                                             <Plus size={14} /> เพิ่มบริการลูกค้า
                                                         </Button>
@@ -686,7 +741,6 @@
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
                                                         <div className="flex items-center gap-2"><Activity size={16} /> อายุ: {customer.age}</div>
                                                         <div className="flex items-center gap-2"><BookHeart size={16} />  อาการ: {customer.healthCondition || "ไม่มีอาการ"}</div>
-                                                        <div className="flex items-center gap-2"><Calendar size={16} />  จำนวนวันที่ดูแล: {customer.shiftTime || "1 วัน"}</div>
                                                         <div className="flex items-center gap-2">
                                                             <Calendar size={16} /> วันเริ่มใช้บริการ: {(() => {
                                                                 if (!customer.serviceDate) return "ไม่มีข้อมูล";
@@ -699,6 +753,7 @@
                                                                 return dateOnly;
                                                             })()}
                                                         </div>
+                                                        <div className="flex items-center gap-2"><Calendar size={16} />  จำนวนวันที่ดูแล: {customer.shiftTime || "1 วัน"}</div>
                                                     </div>
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-slate-500 dark:text-slate-400 mt-3">
                                                         <div className="flex items-center gap-2 md:col-span-3"><MapPin size={16} /> สถานที่ให้บริการ: {customer.location || "No location"}</div>
@@ -716,7 +771,7 @@
                                                     )}
                                                 </div>
                                                 <div className="flex md:flex-col justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Button variant="secondary" className="!p-2 text-sm" onClick={() => handleEdit(customer)}><Edit size={16} /></Button>
+                                                    <Button variant="secondary" className="!p-2 text-sm" onClick={() => handleEdit(customer, 'แก้ไขบริการลูกค้า')}><Edit size={16} /></Button>
                                                     <Button variant="danger" className="!p-2 text-sm" onClick={() => handleDelete(customer.id)}><Trash2 size={16} /></Button>
                                                 </div>
                                             </div>
