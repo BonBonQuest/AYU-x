@@ -122,6 +122,22 @@
 
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
+
+        // --- Date Utilities ---
+        const formatThaiDate = (dateStr) => {
+            if (!dateStr) return "ไม่มีข้อมูล";
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}/${month}/${year}`;
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
         // --- Icon Wrapper & Definitions ---
         // Fix for Lucide icons in standalone React
         const Icon = ({ name, size = 24, className = "" }) => {
@@ -182,6 +198,8 @@
         const ChevronRight = (props) => <Icon name="ChevronRight" {...props} />;
         const Coins = (props) => <Icon name="Coins" {...props} />;
         const BookHeart = (props) => <Icon name="BookHeart" {...props} />;
+        const Phone = (props) => <Icon name="Phone" {...props} />;
+        const FileText = (props) => <Icon name="FileText" {...props} />;
         const ChevronDown = (props) => <Icon name="ChevronDown" {...props} />;
 
 
@@ -283,8 +301,17 @@
 
         // 1. Dashboard
         const Dashboard = ({ customers, staff }) => {
-            const totalCustomers = customers.length;
-            const activeCustomers = customers.filter(c => c.status !== 'Inactive').length; // Assuming logical status or just all
+            // Count only customers currently being served (not expired)
+            const activeCustomers = customers.filter(customer => {
+                if (!customer.serviceDate || !customer.shiftTime) return false;
+                const serviceStartDate = new Date(customer.serviceDate);
+                const careDays = parseInt(customer.shiftTime) || 0;
+                const serviceEndDate = new Date(serviceStartDate);
+                serviceEndDate.setDate(serviceStartDate.getDate() + careDays);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                return today <= serviceEndDate;
+            }).length;
 
             const totalStaff = staff.length;
             const totalShiftD = customers.filter(c => c.shift === 'D').length;
@@ -295,6 +322,7 @@
                 : 0;
 
             const recentCustomers = [...customers].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+            const recentStaff = [...staff].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
 
             return (
                 <div className="space-y-6 fade-in">
@@ -305,24 +333,28 @@
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <StatCard
-                            title="Total Customers"
-                            value={totalCustomers}
+                            key="active-customers"
+                            title="Active Customer"
+                            value={activeCustomers}
                             icon={<Users size={24} />}
-                            subLabel="Active directory"
+                            subLabel="Currently being served"
                         />
                         <StatCard
+                            key="total-staff"
                             title="Total Staff"
                             value={totalStaff}
                             icon={<Briefcase size={24} />}
                             subLabel="Qualified personnel"
                         />
                         <StatCard
+                            key="day-shifts"
                             title="Day Shifts"
                             value={totalShiftD}
                             icon={<Sun size={24} />}
                             subLabel="Scheduled for Day"
                         />
                         <StatCard
+                            key="average-age"
                             title="Average Age"
                             value={avgAge}
                             icon={<Activity size={24} />}
@@ -365,15 +397,20 @@
                                 Staff Availability
                             </h3>
                             <div className="space-y-4">
-                                {staff.slice(0, 5).map(s => (
+                                {recentStaff.map(s => (
                                     <div key={s.id} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
                                         <div>
                                             <p className="font-medium text-slate-800 dark:text-slate-200">{s.staffName}</p>
-                                            <p className="text-xs text-slate-500">{s.qualification}</p>
+                                            <p className="text-xs text-slate-500">{s.notes}</p>
                                         </div>
-                                        <Badge color={s.availability === 'Full-time' ? 'green' : (s.availability === 'Part-time' ? 'blue' : 'amber')}>
-                                            {s.availability || 'N/A'}
-                                        </Badge>
+                                        <div className="flex gap-2">
+                                            <Badge key={`${s.id}-duty`} color={s.duty === 'RN' ? 'green' : (s.duty === 'PN' ? 'blue' : 'amber')}>
+                                                {s.duty || '???'}
+                                            </Badge>
+                                            <Badge key={`${s.id}-employment`} color={s.employmentType === 'Full-Time' ? 'green' : (s.employmentType === 'Part-Time' ? 'blue' : 'amber')}>
+                                                {s.employmentType || '???'}
+                                            </Badge>
+                                        </div>
                                     </div>
                                 ))}
                                 {staff.length === 0 && <p className="text-slate-400 text-center py-8">No staff records</p>}
@@ -453,7 +490,14 @@
                             healthCondition: c.healthCondition,
                             serviceType: c.serviceType,
                             rate: c.rate,
-                            serviceDate: c.serviceDate ? c.serviceDate.split(/[T ]/)[0] : "",
+                            serviceDate: c.serviceDate ? (() => {
+                                const d = new Date(c.serviceDate);
+                                if (isNaN(d.getTime())) return c.serviceDate;
+                                const y = d.getFullYear();
+                                const m = String(d.getMonth() + 1).padStart(2, '0');
+                                const day = String(d.getDate()).padStart(2, '0');
+                                return `${y}-${m}-${day}`;
+                            })() : "",
                             shift: c.shift,
                             shiftTime: c.shiftTime,
                             location: c.location,
@@ -742,16 +786,7 @@
                                                         <div className="flex items-center gap-2"><Activity size={16} /> อายุ: {customer.age}</div>
                                                         <div className="flex items-center gap-2"><BookHeart size={16} />  อาการ: {customer.healthCondition || "ไม่มีอาการ"}</div>
                                                         <div className="flex items-center gap-2">
-                                                            <Calendar size={16} /> วันเริ่มใช้บริการ: {(() => {
-                                                                if (!customer.serviceDate) return "ไม่มีข้อมูล";
-                                                                // Strip time if present (T or space)
-                                                                const dateOnly = customer.serviceDate.split(/[T ]/)[0];
-                                                                const parts = dateOnly.split('-');
-                                                                if (parts.length === 3) {
-                                                                    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-                                                                }
-                                                                return dateOnly;
-                                                            })()}
+                                                            <Calendar size={16} /> วันเริ่มใช้บริการ: {formatThaiDate(customer.serviceDate)}
                                                         </div>
                                                         <div className="flex items-center gap-2"><Calendar size={16} />  จำนวนวันที่ดูแล: {customer.shiftTime || "1 วัน"}</div>
                                                     </div>
@@ -788,16 +823,20 @@
         const StaffManager = ({ staff, setStaff, postToSheet }) => {
             const [view, setView] = useState('list');
             const [isSaving, setIsSaving] = useState(false);
+            const [searchQuery, setSearchQuery] = useState('');
 
             const initialForm = {
                 id: null,
+                pid: '',
                 staffName: '',
-                qualification: '',
-                rate: '',
-                availability: '', // Full-time, Part-time, Casual
-                experience: '',
-                address: '',
                 phone: '',
+                address: '',
+                position: 'staff',
+                duty: 'NA',
+                experience: '',
+                employmentType: 'Full-Time',
+                rate: '',
+                bankInfo: '',
                 notes: '',
                 createdAt: ''
             };
@@ -832,8 +871,17 @@
                 try {
                     const action = formData.id ? 'update' : 'add';
                     const payload = {
-                        ...formData,
-                        id: formData.id || Date.now(),
+                        pid: formData.pid,
+                        staffName: formData.staffName,
+                        phone: "'" + formData.phone,
+                        address: formData.address,
+                        position: formData.position,
+                        duty: formData.duty,
+                        experience: formData.experience,
+                        employmentType: formData.employmentType,
+                        rate: formData.rate,
+                        bankInfo: formData.bankInfo,
+                        notes: formData.notes,
                         createdAt: formData.createdAt || new Date().toISOString()
                     };
 
@@ -864,40 +912,58 @@
                     <div className="fade-in max-w-3xl mx-auto">
                         <div className="flex items-center justify-between mb-6">
                             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-                                {formData.id ? 'Edit Staff' : 'New Staff'}
+                                {formData.id ? 'แก้ไขข้อมูลพนักงาน' : 'เพิ่มพนักงานใหม่'}
                             </h2>
-                            <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }}>Cancel</Button>
+                            <Button variant="secondary" onClick={() => { setView('list'); setFormData(initialForm); }}>ยกเลิก</Button>
                         </div>
                         <Card>
                             <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="col-span-1 md:col-span-2">
-                                    <Input label="Staff Name" name="staffName" value={formData.staffName} onChange={e => setFormData({ ...formData, staffName: e.target.value })} required placeholder="e.g. Nurse Joy" />
+                                    <Input label="เลขบัตรประชาชน 13 หลัก" name="pid" value={formData.pid} onChange={e => setFormData({ ...formData, pid: e.target.value })} required placeholder="x-xxxx-xxxxx-xx-x" />
                                 </div>
-                                <Input label="Qualification" name="qualification" value={formData.qualification} onChange={e => setFormData({ ...formData, qualification: e.target.value })} placeholder="e.g. RN, PN, NA" />
-                                <Select label="Availability" name="availability" value={formData.availability} onChange={e => setFormData({ ...formData, availability: e.target.value })}
+                                <Input label="ชื่อ-นามสกุล" name="staffName" value={formData.staffName} onChange={e => setFormData({ ...formData, staffName: e.target.value })} required placeholder="ชื่อจริง-นามสกุล" />
+                                <Input label="เบอร์โทรติดต่อ" type="tel" name="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required placeholder="08x-xxx-xxxx" />
+
+                                <div className="col-span-1 md:col-span-2">
+                                    <Input label="ที่อยู่" name="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="ที่อยู่ปัจจุบัน" />
+                                </div>
+
+                                <Select label="ตำแหน่ง" name="position" value={formData.position} onChange={e => setFormData({ ...formData, position: e.target.value })}
                                     options={[
-                                        { value: 'Full-time', label: 'Full-time' },
-                                        { value: 'Part-time', label: 'Part-time' },
+                                        { value: 'staff', label: 'Staff' },
+                                        { value: 'admin', label: 'Admin' },
+                                        { value: 'CEO', label: 'CEO' },
+                                        { value: 'owner', label: 'Owner' }
+                                    ]}
+                                />
+                                <Select label="หน้าที่" name="duty" value={formData.duty} onChange={e => setFormData({ ...formData, duty: e.target.value })}
+                                    options={[
+                                        { value: 'RN', label: 'RN' },
+                                        { value: 'PN', label: 'PN' },
+                                        { value: 'NA', label: 'NA' }
+                                    ]}
+                                />
+
+                                <Input label="ประสพการณ์" name="experience" value={formData.experience} onChange={e => setFormData({ ...formData, experience: e.target.value })} placeholder="เช่น 5 ปี" />
+                                <Select label="ประเภทเวลาทำงาน" name="employmentType" value={formData.employmentType} onChange={e => setFormData({ ...formData, employmentType: e.target.value })}
+                                    options={[
+                                        { value: 'Full-Time', label: 'Full-Time' },
+                                        { value: 'Part-Time', label: 'Part-Time' },
                                         { value: 'Freelance', label: 'Freelance' }
                                     ]}
                                 />
 
-                                <Input label="Rate (THB)" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
-                                <Input label="Experience (Years)" name="experience" value={formData.experience} onChange={e => setFormData({ ...formData, experience: e.target.value })} placeholder="e.g. 5" />
-                                <Input label="Phone" type="tel" name="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} placeholder="089-xxx-xxxx" />
+                                <Input label="ค่าแรง" type="number" name="rate" value={formData.rate} onChange={e => setFormData({ ...formData, rate: e.target.value })} placeholder="0.00" />
+                                <Input label="ชื่อบัญชีธนาคาร+เลขที่บัญชี" name="bankInfo" value={formData.bankInfo} onChange={e => setFormData({ ...formData, bankInfo: e.target.value })} placeholder="ไทยพาณิชย์ 123-x-xxxxx-x" />
 
                                 <div className="col-span-1 md:col-span-2">
-                                    <Input label="Address" name="address" value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} placeholder="Full address" />
-                                </div>
-
-                                <div className="col-span-1 md:col-span-2">
-                                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5 block">Notes</label>
+                                    <label className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1.5 block">Note</label>
                                     <textarea
                                         className="w-full px-4 py-2.5 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white"
                                         rows="3"
                                         value={formData.notes}
                                         onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                        placeholder="Skills, preferences..."
+                                        placeholder="ข้อมูลเพิ่มเติม..."
                                     ></textarea>
                                 </div>
 
@@ -909,7 +975,7 @@
                                                 <span className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></span>
                                                 Saving...
                                             </>
-                                        ) : 'Save Staff'}
+                                        ) : 'บันทึกข้อมูล'}
                                     </Button>
                                 </div>
                             </form>
@@ -925,7 +991,20 @@
                             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">ระบบจัดการพนักงาน</h2>
                             <p className="text-slate-500 dark:text-slate-400">จัดการรายชื่อพนักงานและข้อมูลพนักงาน</p>
                         </div>
-                        <Button onClick={() => setView('form')}><Plus size={20} /> เพื่มพนักงานใหม่</Button>
+                        <Button onClick={() => setView('form')}><Plus size={20} /> เพิ่มพนักงานใหม่</Button>
+                    </div>
+
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <Search size={20} />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="ค้นหารายชื่อพนักงาน..."
+                            className="w-full pl-10 pr-4 py-3 rounded-xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none transition-all dark:text-white shadow-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
 
                     {staff.length === 0 ? (
@@ -939,24 +1018,31 @@
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {staff.map(member => (
+                            {staff.filter(member => {
+                                const query = searchQuery.toLowerCase();
+                                return member.staffName.toLowerCase().includes(query) ||
+                                    (member.phone && String(member.phone).toLowerCase().includes(query)) ||
+                                    (member.address && String(member.address).toLowerCase().includes(query)) ||
+                                    (member.notes && String(member.notes).toLowerCase().includes(query));
+                            }).map(member => (
                                 <Card key={member.id} className="relative group hover:border-brand-500/50 transition-colors flex flex-col justify-between">
                                     <div>
                                         <div className="flex justify-between items-start mb-4">
                                             <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xl font-bold text-slate-600 dark:text-slate-300">
                                                 {member.staffName.charAt(0).toUpperCase()}
                                             </div>
-                                            <Badge color={member.availability === 'Full-time' ? 'green' : 'blue'}>
-                                                {member.availability || 'N/A'}
+                                            <Badge color={member.employmentType === 'Full-Time' ? 'green' : (member.employmentType === 'Part-Time' ? 'blue' : 'amber')}>
+                                                {member.employmentType || 'N/A'}
                                             </Badge>
                                         </div>
                                         <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{member.staffName}</h3>
-                                        <p className="text-brand-600 dark:text-brand-400 text-sm font-medium mb-4">{member.qualification}</p>
+                                        <p className="text-brand-600 dark:text-brand-400 text-sm font-medium mb-4">{member.position} • {member.duty}</p>
 
                                         <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
                                             <div className="flex items-center gap-2"><Briefcase size={16} /> {member.experience} Year(s) Exp.</div>
                                             <div className="flex items-center gap-2"><MapPin size={16} /> {member.address || "No Address"}</div>
-                                            <div className="flex items-center gap-2"><Users size={16} /> {member.phone || "No Phone"}</div>
+                                            <div className="flex items-center gap-2"><Phone size={16} /> {member.phone || "No Phone"}</div>
+                                            {member.notes && <div className="flex items-center gap-2"><FileText size={16} /> {member.notes}</div>}
                                         </div>
                                     </div>
 
@@ -974,10 +1060,30 @@
 
 
         // 4. Nurse Roster Component
-        const NurseRoster = ({ staff, roster, setRoster }) => {
+        const NurseRoster = ({ staff, roster, setRoster, customers }) => {
             const [currentDate, setCurrentDate] = useState(new Date());
             const [selectedDate, setSelectedDate] = useState(null);
             const [isModalOpen, setIsModalOpen] = useState(false);
+
+            // Filter for active/relevant customers to show on roster
+            const getCustomersForDate = (date) => {
+                const targetDate = new Date(date);
+                targetDate.setHours(0, 0, 0, 0);
+
+                return customers.filter(customer => {
+                    const serviceStartDate = new Date(customer.serviceDate);
+                    serviceStartDate.setHours(0, 0, 0, 0);
+
+                    const careDays = parseInt(customer.shiftTime) || 0;
+                    if (careDays === 0) return false;
+
+                    const serviceEndDate = new Date(serviceStartDate);
+                    serviceEndDate.setDate(serviceStartDate.getDate() + careDays - 1); // -1 because inclusive
+                    serviceEndDate.setHours(23, 59, 59, 999);
+
+                    return targetDate >= serviceStartDate && targetDate <= serviceEndDate;
+                });
+            };
 
             // Temporary state for the modal form - for adding NEW shift
             const [newShift, setNewShift] = useState({
@@ -1107,12 +1213,28 @@
                                 const shifts = roster[dateKey] || [];
                                 const isToday = new Date().toDateString() === new Date(year, month, day).toDateString();
 
+                                // Check if date is in the past
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                const currentDate = new Date(year, month, day);
+                                currentDate.setHours(0, 0, 0, 0);
+                                const isPast = currentDate < today;
+
+                                // Check if there are customers on this date
+                                const customersOnDate = getCustomersForDate(new Date(year, month, day));
+                                const hasCustomers = customersOnDate.length > 0;
+
+                                // Can only click if not in past AND has customers
+                                const canClick = !isPast && hasCustomers;
+
                                 return (
                                     <div
                                         key={day}
-                                        onClick={() => handleDayClick(day)}
-                                        className={`h-32 p-2 rounded-xl border transition-all cursor-pointer relative group overflow-hidden
-                                            ${isToday ? 'border-brand-500 bg-brand-50/30 dark:bg-brand-900/10' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-dark-800 hover:border-brand-300 dark:hover:border-slate-600'}
+                                        onClick={canClick ? () => handleDayClick(day) : undefined}
+                                        className={`h-32 p-2 rounded-xl border transition-all relative group overflow-hidden
+                                            ${!canClick ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                            ${isToday ? 'border-brand-500 bg-brand-50/30 dark:bg-brand-900/10' : 'border-slate-100 dark:border-slate-700 bg-white dark:bg-dark-800'}
+                                            ${canClick && !isToday ? 'hover:border-brand-300 dark:hover:border-slate-600' : ''}
                                         `}
                                     >
                                         <div className={`text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full mb-1
@@ -1121,7 +1243,17 @@
                                             {day}
                                         </div>
 
-                                        <div className="flex flex-col gap-1 max-h-[85px] overflow-y-auto no-scrollbar">
+                                        <div className="flex flex-col gap-1 max-h-[90px] overflow-y-auto no-scrollbar pb-1">
+                                            {/* Customer Assignments Section */}
+                                            {getCustomersForDate(new Date(year, month, day)).map((customer, idx) => (
+                                                <div key={`cust-${idx}`} className="text-[10px] p-0.5 px-1.5 rounded bg-blue-50 text-blue-700 border border-blue-100 font-bold truncate flex items-center gap-1">
+                                                    <Users size={10} className="shrink-0" />
+                                                    {customer.customerName} ({customer.serviceCode})
+                                                </div>
+                                            ))}
+
+                                            {/* Nurse Assignments Section */}
+                                            <div className="border-t border-slate-50 dark:border-slate-800 my-0.5 pt-0.5"></div>
                                             {shifts.map((shift, idx) => (
                                                 <div key={idx} className={`text-xs p-1 rounded-md font-medium truncate flex items-center gap-1
                                                     ${shift.shiftType === 'D' ? 'bg-amber-100 text-amber-800' :
@@ -1206,7 +1338,7 @@
                                         >
                                             <option value="">-- Choose Nurse --</option>
                                             {staff.filter(s => !currentDayShifts.some(assigned => assigned.nurseId.toString() === s.id.toString())).map(s => (
-                                                <option key={s.id} value={s.id}>{s.staffName} ({s.qualification})</option>
+                                                <option key={s.id} value={s.id}>{s.staffName} ({s.duty})</option>
                                             ))}
                                         </select>
                                     </div>
@@ -1426,7 +1558,7 @@
                                     {activeTab === 'dashboard' && <Dashboard customers={customers} staff={staff} />}
                                     {activeTab === 'customers' && <CustomerManager customers={customers} setCustomers={setCustomers} postToSheet={postToSheet} />}
                                     {activeTab === 'staff' && <StaffManager staff={staff} setStaff={setStaff} postToSheet={postToSheet} />}
-                                    {activeTab === 'roster' && <NurseRoster staff={staff} roster={roster} setRoster={setRoster} />}
+                                    {activeTab === 'roster' && <NurseRoster staff={staff} roster={roster} setRoster={setRoster} customers={customers} />}
                                 </>
                             )}
                         </div>
